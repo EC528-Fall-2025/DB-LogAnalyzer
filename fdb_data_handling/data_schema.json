@@ -1,0 +1,61 @@
+{
+    "$schema": " ",
+    "title": "FDB TraceEvent",
+    "type": "object",
+    "additionalProperties": true,
+    
+    "properties": {
+        "Time": {
+            "description": "Event timestamp in UTC",
+            "type": "string",
+            "format": "date-time"
+        },
+        "Severity": {
+            "description": "Numeric Severity",
+            "type": "integer"
+            "enum": [10,20,30,40]
+        },
+        "Type": {
+            "description": "Event name",
+            "type": "string",
+            "minLength": 1
+        },
+        "Process": {
+            "description": "Process kind (e.g., fdbserver)",
+            "type": "string"
+        },
+        "Role": {
+            "description": "Role shorthand (e.g., CC, DD,TS, TLog, Proxy, Resolver)",
+            "type": "string"
+        },
+        "PID": {
+            "description": "OS process id",
+            "type": "integer",
+            "minimun": 0
+        },
+        "MachineId": {
+            "description": "ip:port of the process",
+            "type": "string",
+            "pattern": "^(\\d{1,3}\\.){3}\\d{1,3}:\\d{1,5}$"
+        }
+    },
+    
+    "required": ["Time", "Severity", "Type"],
+    
+    /*
+        To allow for other events with different numeric metricts (DiskQueue, DurabilityLag, GrvLatency, KVOps)
+    */
+    "patternProperties": {
+        "^[A-Za-z][A-Za-z0-9_]*$": {
+            "oneOf": [
+                { "type": "number" },
+                { "type": "string" },
+                { "type": "boolean" },
+                { "type": "integer" },
+                { "type": "object" },
+                { "type": "array" }
+            ]
+        }
+    }
+}
+
