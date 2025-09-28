@@ -15,7 +15,7 @@ create table if not exists events (
 );
 
 create table if not exists event_metrics (
-  event_id     bigint not null,
+  event_id     varchar not null,
   metric_name  varchar not null,
   metric_value double,
   unit         varchar,            
@@ -24,7 +24,7 @@ create table if not exists event_metrics (
 );
 
 create table if not exists events_wide (
-  event_id            bigint primary key references events(event_id),
+  event_id            varchar(255) primary key references events(event_id),
   grv_latency_ms      double,
   txn_volume          double,
   queue_bytes         double,
@@ -52,3 +52,4 @@ create table if not exists process_roles (
   end_ts        timestamp,             
   primary key (process_key, role, start_ts)
 );
+
