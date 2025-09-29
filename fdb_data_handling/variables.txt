@@ -1,0 +1,63 @@
+*** events table: ***
+~canonical per-event records~
+
+event --> type of event (e.g. "ProgramStart", "Transaction)
+process --> The process name/class (like "fdbserver") 
+role --> the role that the process was playing (like "TLog", "Proxy") 
+pid --> os process ID
+machine_id --> unique identifier for the machine that logged this event
+address --> usally "ip:port" where the process is bound 
+trace_file --> traces log file this event came from 
+src_line --> whice trace log file this event came from 
+raw_json --> the entire original JSON log object, full fidelity 
+fields_json --> extra fields not mapped into fixed columns --> leading to the extra tables 
+
+
+*** event_metrics table (one row = one numeric metric associated with an event): *** 
+~flexible tall table for numeric metrics~
+
+event_id --> links back to events 
+metric_name --> the key (e.g. "LatencyMs", "DiskUsage") 
+metric_value --> numeric value associated with the metric (float) 
+unit --> optional unit "ms", "bytes" etc..
+is_counter --> wheter the metric is a counter that increases over time 
+primary key for this table are event_id and metric_name to prevent duplicates
+
+
+*** events_wide table (curated columns for common performance metrics, each metric gets its own *** column for fast querying) 
+~optimized table with curated columns~
+
+grv_latency_ms --> latency for GRV (Get Read Version)
+txn_volume --> number of transactions 
+queue_bytes --> byte in queue 
+durability_lag_s --> replication lag in seconds 
+data_move_in_flight --> how much data migration is happening 
+disk_queue_bytes --> how much data is waiting in disk queue 
+kv_ops --> key-value operations per event 
+
+
+*** processes table ***
+~unique processes with metadata~
+
+process_key --> composite key (machine_id|pid) used in parser 
+first_seen_ts, last_seen_ts --> when process was active
+address --> where it was ran (ip:port or machine) 
+pid --> operating system process id 
+class --> what kind of process it was (e.g., "ClusterController", "Storage")
+version --> binary version of the process
+command_line --> the command used to start it 
+
+
+
+*** process_roles ***
+~timeline of what each process is doing~
+
+role --> the role (e.g., "Proxy", "TLog", "Resolver") 
+start_ts --> when role started 
+end_ts --> when the role ended 
+
+
+
+
+
+
