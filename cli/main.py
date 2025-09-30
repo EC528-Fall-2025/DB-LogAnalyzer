@@ -501,7 +501,7 @@ class CLI:
             # Call Group B's rollup function
             service.create_rollups(args.interval)
             
-            print(f"\n✅ Rollup table 'rollups_{args.interval}s' created successfully!")
+            print(f"\nRollup table 'rollups_{args.interval}s' created successfully!")
             print(f"\nYou can now query the rollup table:")
             print(f"  python main.py query \"SELECT * FROM rollups_{args.interval}s LIMIT 10\"")
             
