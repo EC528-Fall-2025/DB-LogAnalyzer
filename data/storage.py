@@ -34,39 +34,59 @@ def init_db(path="fdb_logs.duckdb"):
     return db
 
     
-def load_logs(db, json_path):
-    # Preprocess first
-    preprocessed = "./data/sample_log_preprocessed.json"
-    preprocess_json(json_path, preprocessed)
+def insert_event(db, e: EventModel):
+    row = e.model_dump()
 
-    # Stage the logs (exploded JSON)
     db.execute("""
-        CREATE OR REPLACE TABLE _staging_raw AS
-        SELECT *
-        FROM read_json_auto(?, format='newline_delimited');
-    """, [preprocessed])
+        INSERT INTO events (
+            event_id, ts, severity, event, process, role,
+            pid, machine_id, address, trace_file, src_line,
+            raw_json, fields_json
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, [
+        row["event_id"],
+        row["ts"],
+        row["severity"],
+        row["event"],
+        row["process"],
+        row["role"],
+        row["pid"],
+        row["machine_id"],
+        row["address"],
+        row["trace_file"],
+        row["src_line"],
+        json.dumps(row["raw_json"]),
+        json.dumps(row["fields_json"])
+    ])
 
-    # Insert into events
+def insert_metrics(db, event_id: int, fields_json: dict):
+    for k, v in fields_json.items():
+        try:
+            val = float(v)
+        except (ValueError, TypeError):
+            continue  # skip non-numeric values
+
+        db.execute("""
+            INSERT INTO event_metrics (event_id, metric_name, metric_value)
+            VALUES (?, ?, ?)
+        """, [event_id, k, val])
+
+def insert_events_wide(db, event_id: int, fields_json: dict):
+    # pick out known metrics if present
+    grv_latency = float(fields_json.get("GRVLatency", "nan")) if "GRVLatency" in fields_json else None
+    txn_volume = float(fields_json.get("TxnVolume", "nan")) if "TxnVolume" in fields_json else None
+    queue_bytes = float(fields_json.get("QueueBytes", "nan")) if "QueueBytes" in fields_json else None
+
     db.execute("""
-    INSERT INTO events
-    SELECT
-      row_number() OVER () AS event_id,
-      CAST(json_extract_string(json, '$.DateTimeParsed') AS TIMESTAMP) AS ts,
-      TRY_CAST(json_extract_string(json, '$.Severity') AS INT) AS severity,
-      json_extract_string(json, '$.Type') AS event,
-      json_extract_string(json, '$.Process') AS process,
-      json_extract_string(json, '$.Role') AS role,
-      TRY_CAST(json_extract_string(json, '$.PID') AS INT) AS pid,
-      json_extract_string(json, '$.Machine') AS machine_id,
-      json_extract_string(json, '$.Address') AS address,
-      json_extract_string(json, '$.TraceFile') AS trace_file,
-      TRY_CAST(json_extract_string(json, '$.SrcLine') AS INT) AS src_line,
-      json AS raw_json,
-      json AS fields_json,
+        INSERT INTO events_wide (
+            event_id, grv_latency_ms, txn_volume, queue_bytes
+        ) VALUES (?, ?, ?, ?)
+    """, [event_id, grv_latency, txn_volume, queue_bytes])
 
-    FROM _staging_raw
-""")
-        # ✅ Fetch and print the first 5 rows that were just added
-    rows = db.execute("SELECT * FROM events ORDER BY event_id DESC LIMIT 5").fetchdf()
-    print("✅ Recently inserted rows:")
-    print(rows)
+def load_into_db(db, log_path: str):
+    for e in parse_logs(log_path):
+        insert_event(db, e)
+        insert_metrics(db, e.event_id, e.fields_json)
+        insert_events_wide(db, e.event_id, e.fields_json)
+
