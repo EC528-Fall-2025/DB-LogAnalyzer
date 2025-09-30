@@ -139,6 +139,16 @@ class CLI:
             help='Custom database schema file path (optional)'
         )
         pipeline_parser.set_defaults(func=self.handle_pipeline)
+
+        # rollup command - Create time-windowed aggregations
+        rollup_parser = subparsers.add_parser('rollup', help='Create rollup aggregations for time windows')
+        rollup_parser.add_argument(
+            '--interval',
+            type=int,
+            default=60,
+            help='Time window interval in seconds (default: 60)'
+        )
+        rollup_parser.set_defaults(func=self.handle_rollup)
         
         return parser
     
@@ -462,6 +472,42 @@ class CLI:
             print(f"New events: {total_loaded}")
             print(f"Output database: {output_path}")
 
+        finally:
+            service.close()
+
+    def handle_rollup(self, args):
+        """Handle rollup command"""
+        service = StorageService(args.db)
+        
+        try:
+            # Check if database exists
+            if not os.path.exists(args.db):
+                print(f"Error: Database does not exist: {args.db}", file=sys.stderr)
+                print("Please load data first using 'load' or 'pipeline' command")
+                sys.exit(1)
+            
+            service.init_db()
+            
+            # Check if there are events
+            event_count = service.get_event_count()
+            if event_count == 0:
+                print("Error: No events in database", file=sys.stderr)
+                print("Please load data first using 'load' or 'pipeline' command")
+                sys.exit(1)
+            
+            print(f"Creating rollup aggregations with {args.interval}s time windows...")
+            print(f"Processing {event_count} events...")
+            
+            # Call Group B's rollup function
+            service.create_rollups(args.interval)
+            
+            print(f"\n✅ Rollup table 'rollups_{args.interval}s' created successfully!")
+            print(f"\nYou can now query the rollup table:")
+            print(f"  python main.py query \"SELECT * FROM rollups_{args.interval}s LIMIT 10\"")
+            
+        except Exception as e:
+            print(f"Rollup creation failed: {e}", file=sys.stderr)
+            sys.exit(1)
         finally:
             service.close()
 
