@@ -95,13 +95,6 @@ def parse_logs(path: str):
                     fields_json={k: v for k, v in obj.items() if k not in mandatory_fields}
                 )
 
-#for testing purposes
-if __name__ == "__main__":
-    sample_path = "/Users/leo/Desktop/Academics/Fall25/Cloud Computing/trace.127.0.0.1.32304.1758756063.r7ZsGg.0.1.xml"
-    it = parse_logs(sample_path)
-    first_three = [next(it).dict() for _ in range(3)]
-    for row in first_three:
-        print(row)
     
     
 
