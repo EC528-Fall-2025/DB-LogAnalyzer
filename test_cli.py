@@ -46,6 +46,12 @@ def test_cli():
         print("✓ Pipeline command executed successfully")
     else:
         print("⚠ Sample log file not found, skipping pipeline test")
+    print("\n" + "="*50 + "\n")
+    
+    # Test 5: Rollup command
+    print("5. Testing rollup command...")
+    cli.run(["--db", "test_pipeline.duckdb", "rollup", "--interval", "60"])
+    print("✓ Rollup command executed successfully")
     
     print("\n=== Testing Complete ===")
     
