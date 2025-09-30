@@ -1,9 +1,10 @@
-from data.storage import init_db, load_into_db
-def main():
-    log_path = 'trace.0.0.0.0.288994.1758137995.CbOixg.0.9.xml'
-    db = init_db("fdb_logs.duckdb")
+#!/usr/bin/env python3
+"""
+FDB Log Analyzer - Main Entry File
+Command-line interface for FoundationDB log analysis tool
+"""
 
-    load_into_db(db, log_path)
+from cli.main import cli
 
 if __name__ == "__main__":
-    main()
+    cli()
