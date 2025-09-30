@@ -2,7 +2,14 @@ import duckdb
 import json
 import datetime
 from datetime import datetime
+from sprint_v1_1.parser import parse_logs, EventModel
 
+def load_into_db(db, log_path: str):
+    for e in parse_logs(log_path):
+        insert_event(db, e)
+        insert_metrics(db, e.event_id, e.fields_json)
+        insert_events_wide(db, e.event_id, e.fields_json)
+        
 def preprocess_json(in_path, out_path):
     with open(in_path) as f:
         lines = f.readlines()
@@ -84,9 +91,5 @@ def insert_events_wide(db, event_id: int, fields_json: dict):
         ) VALUES (?, ?, ?, ?)
     """, [event_id, grv_latency, txn_volume, queue_bytes])
 
-def load_into_db(db, log_path: str):
-    for e in parse_logs(log_path):
-        insert_event(db, e)
-        insert_metrics(db, e.event_id, e.fields_json)
-        insert_events_wide(db, e.event_id, e.fields_json)
+
 
