@@ -132,6 +132,44 @@ class StorageService:
             ) VALUES (?, ?, ?, ?)
         """, [str(event_id), grv_latency, txn_volume, queue_bytes])
     
+    def create_rollups(self, interval_seconds: int = 60):
+        """
+        Create rollup materializations for metrics.
+
+        Args:
+            interval_seconds: Window size in seconds (default 60)
+        """
+        if not self.db:
+            raise RuntimeError("Database not initialized, please call init_db() first")
+
+        # Create the window view
+        self.db.execute(f"""
+            create or replace view _win_{interval_seconds}s as
+            select range as window_start, window_start + interval {interval_seconds} second as window_end
+            from range((select min(ts) from events),
+                       (select max(ts) from events),
+                       interval {interval_seconds} second);
+        """)
+
+        # Create the rollups table
+        self.db.execute(f"""
+            create table if not exists rollups_{interval_seconds}s as
+            select
+              w.window_start,
+              e.role,
+              m.metric_name,
+              count(*)                            as n,
+              avg(m.metric_value)                 as avg,
+              max(m.metric_value)                 as max,
+              quantile_cont(m.metric_value, 0.95) as p95
+            from _win_{interval_seconds}s w
+            join events e
+              on e.ts >= w.window_start and e.ts < w.window_end
+            join event_metrics m using (event_id)
+            group by 1,2,3;
+        """)
+        print(f"✅ Created rollups_{interval_seconds}s table with windowed aggregates")
+
     def check_events_loaded(self) -> bool:
         """Check if events have been loaded"""
         if not self.db:
