@@ -10,6 +10,10 @@
 | Leo Phung| leophung@bu.edu |
 | Sara Al Sowaimel | salsowa@bu.edu |
 
+## Sprint Demo Videos and Slides
+- **Sprint 1 Demo Video:** [Link](https://drive.google.com/file/d/1bHu6nhIrEkouQ02xXVG0B5ajXGo_30Uo/view?usp=drive_link)  
+- **Sprint 1 Demo Slides:** [Link](https://docs.google.com/presentation/d/13x_g204QpMCRAE1XFmgZDgtySpRFXZm0/edit?usp=sharing&ouid=113513264960850511829&rtpof=true&sd=true)  
+
 ## 1.   Vision and Goals Of The Project:
 
 ### Goal
