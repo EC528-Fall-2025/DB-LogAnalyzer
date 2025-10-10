@@ -141,33 +141,49 @@ class StorageService:
         """
         if not self.db:
             raise RuntimeError("Database not initialized, please call init_db() first")
+        
+        self.db.execute(f"""
+            CREATE TABLE IF NOT EXISTS rollups_{interval_seconds}s AS
+            SELECT
+                date_trunc('second', ts) - (extract(epoch from ts)::int % {interval_seconds}) * INTERVAL '1 second' AS window_start,
+                role,
+                metric_name,
+                COUNT(*) AS n,
+                AVG(metric_value) AS avg,
+                MAX(metric_value) AS max,
+                quantile_cont(metric_value, 0.95) AS p95
+            FROM events
+            JOIN event_metrics USING (event_id)
+            GROUP BY 1, 2, 3
+            ORDER BY 1, 2, 3;
+        """)
 
         # Create the window view
-        self.db.execute(f"""
-            create or replace view _win_{interval_seconds}s as
-            select range as window_start, window_start + interval {interval_seconds} second as window_end
-            from range((select min(ts) from events),
-                       (select max(ts) from events),
-                       interval {interval_seconds} second);
-        """)
+        # self.db.execute(f"""
+        #     create or replace view _win_{interval_seconds}s as
+        #     select range as window_start, window_start + interval {interval_seconds} second as window_end
+        #     from range((select min(ts) from events),
+        #                (select max(ts) from events),
+        #                interval {interval_seconds} second);
+        # """)
 
         # Create the rollups table
-        self.db.execute(f"""
-            create table if not exists rollups_{interval_seconds}s as
-            select
-              w.window_start,
-              e.role,
-              m.metric_name,
-              count(*)                            as n,
-              avg(m.metric_value)                 as avg,
-              max(m.metric_value)                 as max,
-              quantile_cont(m.metric_value, 0.95) as p95
-            from _win_{interval_seconds}s w
-            join events e
-              on e.ts >= w.window_start and e.ts < w.window_end
-            join event_metrics m using (event_id)
-            group by 1,2,3;
-        """)
+        # self.db.execute(f"""
+        #     create table if not exists rollups_{interval_seconds}s as
+        #     select
+        #       w.window_start,
+        #       e.role,
+        #       m.metric_name,
+        #       count(*)                            as n,
+        #       avg(m.metric_value)                 as avg,
+        #       max(m.metric_value)                 as max,
+        #       quantile_cont(m.metric_value, 0.95) as p95
+        #     from _win_{interval_seconds}s w
+        #     join events e
+        #       on e.ts >= w.window_start and e.ts < w.window_end
+        #     join event_metrics m using (event_id)
+        #     group by 1,2,3;
+        # """)
         print(f"✅ Created rollups_{interval_seconds}s table with windowed aggregates")
 
     def check_events_loaded(self) -> bool:
