@@ -53,7 +53,7 @@ class CLI:
         init_parser.set_defaults(func=self.handle_init)
         
         # load command - Load logs
-        load_parser = subparsers.add_parser('load', help='Load log file to database')
+        load_parser = subparsers.add_parser('load', help='Load log file(s) to database (to load mulitple, use directory)')
         load_parser.add_argument(
             'log_file',
             help='Log file path (supports JSON, XML formats)'
@@ -62,6 +62,11 @@ class CLI:
             '--schema',
             default='data/schema.sql',
             help='Database schema file path (if database does not exist)'
+        )
+        load_parser.add_argument(
+            '--all',
+            action='store_true',
+            help='If set, automatically load all rollover files (.1.xml, .2.xml, etc.) or all logs in directory'
         )
         load_parser.set_defaults(func=self.handle_load)
         
@@ -171,14 +176,36 @@ class CLI:
     
     def handle_load(self, args):
         """Handle load command"""
+        import glob, re
         # Check if log file exists
         if not os.path.exists(args.log_file):
             print(f"Error: Log file does not exist: {args.log_file}", file=sys.stderr)
             sys.exit(1)
         
-        print(f"Loading log file: {args.log_file}")
         print(f"Target database: {args.db}")
+
+        log_dir = args.log_file
+        files_to_load = []
+
+        if args.all:
+            # Check if user wants to load all files
+            if not os.path.isdir(log_dir):
+                print(f"Error: Expected a directory, got: {log_dir}", file=sys.stderr)
+                sys.exit(1)
+            
+            files_to_load = sorted(glob.glob((os.path.join(log_dir, "*.xml"))))
+            print(f"Following {len(files_to_load)} files loaded: {files_to_load}")
+            if not files_to_load:
+                print(f"No .xml logs found in directory: {log_dir}")
         
+        else:
+            # Single file mode
+            if not os.path.isfile(log_dir):
+                print(f"Error: Expected a file path, got directory: {log_dir}", file=sys.stderr)
+                sys.exit(1)
+            files_to_load = [log_dir]
+
+
         service = StorageService(args.db)
         
         # Initialize database (if needed)
@@ -194,12 +221,15 @@ class CLI:
             if response.lower() != 'y':
                 print("Operation cancelled")
                 service.close()
-                return
+                return        
         
         # Load logs
+        total = 0
         try:
-            count = service.load_logs_from_file(args.log_file)
-            print(f"Successfully loaded {count} events!")
+            for file in files_to_load:
+                count = service.load_logs_from_file(file, event_id_offset=total)
+                total += count
+            print(f"Successfully loaded {total} events from {len(files_to_load)} file(s)!")
         except Exception as e:
             print(f"Load failed: {e}", file=sys.stderr)
             sys.exit(1)
