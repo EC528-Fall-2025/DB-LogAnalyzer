@@ -77,7 +77,7 @@ class LogParser:
             ts=ts,
             severity=int(obj["Severity"]) if "Severity" in obj else None,
             event=obj.get("Type"),
-            process=obj.get("Process"),
+            process=obj.get("Processes"),
             role=obj.get("Role"),
             pid=int(obj["PID"]) if "PID" in obj else None,
             machine_id=obj.get("Machine") or obj.get("MachineId"),
