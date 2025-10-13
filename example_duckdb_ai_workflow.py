@@ -57,10 +57,13 @@ class DuckDBAIWorkflow:
             machine_id,
             CAST(json_extract_string(fields_json, '$.Max') AS DOUBLE) as max_latency,
             CAST(json_extract_string(fields_json, '$.P99') AS DOUBLE) as p99_latency,
-            CAST(json_extract_string(fields_json, '$.Mean') AS DOUBLE) as mean_latency
+            CAST(json_extract_string(fields_json, '$.Mean') AS DOUBLE) as mean_latency,
+            CAST(json_extract_string(fields_json, '$.Count') AS INTEGER) as count
         FROM events
         WHERE event LIKE '%LatencyMetrics'
             AND json_extract_string(fields_json, '$.Max') IS NOT NULL
+            AND CAST(json_extract_string(fields_json, '$.Count') AS INTEGER) > 0
+            AND CAST(json_extract_string(fields_json, '$.Max') AS DOUBLE) >= 0
         ORDER BY ts
         """
         
