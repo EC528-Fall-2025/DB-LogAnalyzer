@@ -24,7 +24,7 @@ def main():
     stats = detector.get_combined_stats()
     token_stats = stats['token_savings']
     
-    print(f"\n📊 Summary:")
+    print(f"\nSummary:")
     print(f"  Original events: {len(events)}")
     print(f"  Anomalies detected: {len(anomalies)}")
     print(f"  Token reduction: {token_stats['token_reduction_rate']*100:.1f}%")

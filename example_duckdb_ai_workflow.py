@@ -262,7 +262,7 @@ Please analyze these anomalies and:
             print("\n" + "=" * 80)
             print("WORKFLOW COMPLETE")
             print("=" * 80)
-            print(f"\n✅ Results:")
+            print(f"\nResults:")
             print(f"  - Total events: {event_count}")
             print(f"  - Anomalies detected: {len(anomalies)}")
             print(f"  - Ready for AI: {ai_input['summary']['included_in_analysis']} events")

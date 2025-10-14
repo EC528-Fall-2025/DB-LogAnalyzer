@@ -7,10 +7,11 @@ import os
 from pathlib import Path
 from service.storage import StorageService
 from service.parser import LogParser
+from service.chunker import TimeChunker, RoleChunker, HybridChunker
 from collections import defaultdict
 from math import floor
 import pandas as pd
-import token 
+import tiktoken 
 
 
 class CLI:
@@ -83,11 +84,19 @@ class CLI:
             help = 'Chunking interval in seconds (default: 300 = 5 minutes)'
         )
         chunk_parser.add_argument(
-            '--linit',
+            '--limit',
             type=int,
             default=5,
             help='Number of chunks to display (default: 5)'
         )
+
+        chunk_parser.add_argument(
+            '--mode',
+            choices=['time', 'role', 'hybrid'],
+            default='time',
+            help='Chunking mode: time-based, role-based, or hybrid (default: time)'
+        )
+
         chunk_parser.set_defaults(func=self.handle_chunk)
 
         # parse command - Parse logs (without storing)
@@ -247,6 +256,7 @@ class CLI:
         total = 0
         try:
             for file in files_to_load:
+                print(f"Loading {file}")
                 count = service.load_logs_from_file(file, event_id_offset=total)
                 total += count
             print(f"Successfully loaded {total} events from {len(files_to_load)} file(s)!")
@@ -333,46 +343,75 @@ class CLI:
             service.close()
     
     def handle_chunk(self, args):
-        """Handle chunk command: group events by time window and show summary"""
+        """Handle chunk command: group events by time window, role, or hybrid"""
+
+        from service.chunker import TimeChunker, RoleChunker, HybridChunker
 
         service = StorageService(args.db)
 
+        print("=" * 80)
+        print(f"CHUNKING MODE: {args.mode.upper()}")
+        print("=" * 80)
+
         try:
+            # --- Step 1: Verify database exists ---
             if not os.path.exists(args.db):
                 print(f"Error: Database does not exist: {args.db}", file=sys.stderr)
                 sys.exit(1)
             
             service.init_db()
 
-            df = service.query("SELECT ts, event, severity, role, machine_id FROM events WHERE ts IS NOT NULL ORDER BY ts").df()
+            # --- Step 2: Load events from DB ---
+            query = """
+                SELECT ts, event, severity, role, machine_id 
+                FROM events 
+                WHERE ts IS NOT NULL
+            """
+            if getattr(args, "role", None):
+                query += f" AND role = '{args.role}'"
+            query += " ORDER BY ts"
+
+            df = service.query(query).df()
+
             if df.empty:
                 print("No events with valid timestamps found.")
                 return
 
             print(f"Total events to chunk: {len(df)}")
-            interval_sec = args.interval
-            start_ts = df['ts'].min()
 
-            # Round timestamps to chunk intervals
-            def round_ts(ts):
-                delta = (ts - start_ts).total_seconds()
-                bucket = floor(delta / interval_sec)
-                return start_ts + pd.Timedelta(seconds=bucket * interval_sec)
+            # --- Step 3: Convert DataFrame rows to event-like objects ---
+            events = [
+                type("Event", (), {
+                    "ts": row.ts,
+                    "event": row.event,
+                    "role": row.role,
+                    "machine_id": row.machine_id
+                })()
+                for row in df.itertuples(index=False)
+            ]
 
-            df['chunk_time'] = df['ts'].apply(round_ts)
-            grouped = df.groupby('chunk_time')
+            # --- Step 4: Select chunking mode ---
+            if args.mode == "time":
+                chunker = TimeChunker(interval_seconds=args.interval)
+            elif args.mode == "role":
+                chunker = RoleChunker()
+            elif args.mode == "hybrid":
+                chunker = HybridChunker(interval_seconds=args.interval)
+            else:
+                print(f"Error: Unsupported mode '{args.mode}'", file=sys.stderr)
+                sys.exit(1)
+
+            # --- Step 5: Perform chunking ---
+            chunks = chunker.chunk(events)
 
             print(f"\nDisplaying first {args.limit} chunk summaries:\n")
-            encoding = tiktoken.encoding_for_model("gpt-4")
 
-            for i, (chunk_time, group) in enumerate(grouped):
-                if i >= args.limit:
-                    break
-                joined_text = "\n".join(group['event'].astype(str).tolist())
-                token_count = len(encoding.encode(joined_text))
-                print(f"🕒 Chunk {i+1}: {chunk_time} → {len(group)} events, ~{token_count} tokens")
-                print(f"  Event types: {group['event'].value_counts().to_dict()}")
-                print()
+            for i, chunk in enumerate(chunks[:args.limit]):
+                print(f"Chunk {i+1}: {chunk.label} → ~{chunk.estimated_tokens} tokens")
+                preview = chunk.text[:250].replace('\n', ' ')
+                print(f"  Preview: {preview}...\n")
+
+            print(f"Total chunks created: {len(chunks)}")
 
         except Exception as e:
             print(f"Chunking failed: {e}", file=sys.stderr)
@@ -380,9 +419,8 @@ class CLI:
         finally:
             service.close()
 
-        
 
-    
+        
     def handle_stats(self, args):
         """Handle stats command"""
         service = StorageService(args.db)

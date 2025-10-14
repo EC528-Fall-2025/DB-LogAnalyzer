@@ -31,21 +31,21 @@ def demo_token_cost_reduction(log_file: str):
     
     parser = LogParser()
     events = list(parser.parse_logs(log_file))
-    print(f"📊 Total events parsed: {len(events)}")
+    print(f"Total events parsed: {len(events)}")
     
     detector = MetricAnomalyDetector(z_score_threshold=2.5)
     anomalies = detector.detect_anomalies(events)
-    print(f"🔍 Anomalies detected: {len(anomalies)}")
+    print(f"Anomalies detected: {len(anomalies)}")
     
     token_stats = detector.estimate_token_savings(avg_tokens_per_event=200)
     
-    print(f"\n💰 Token Reduction Analysis:")
+    print(f"\nToken Reduction Analysis:")
     print(f"  Without filter: {token_stats['total_tokens_without_filter']:,} tokens")
     print(f"  With filter: {token_stats['total_tokens_with_filter']:,} tokens")
     print(f"  Tokens saved: {token_stats['tokens_saved']:,}")
     print(f"  Reduction rate: {token_stats['token_reduction_rate']*100:.2f}%")
     
-    print(f"\n📋 Sample Anomalies (first 3):")
+    print(f"\nSample Anomalies (first 3):")
     for i, (event, reasons) in enumerate(anomalies[:3], 1):
         print(f"\n  [{i}] Event #{event.event_id}: {event.event}")
         print(f"      Timestamp: {event.ts}")
@@ -77,7 +77,7 @@ def demo_context_size_problem(log_file: str):
     avg_tokens_per_event = 200
     total_tokens = len(events) * avg_tokens_per_event
     
-    print(f"📊 Your log file:")
+    print(f"Your log file:")
     print(f"  Total events: {len(events)}")
     print(f"  Estimated tokens: {total_tokens:,}")
     
@@ -85,7 +85,7 @@ def demo_context_size_problem(log_file: str):
     anomalies = detector.detect_anomalies(events)
     filtered_tokens = len(anomalies) * avg_tokens_per_event
     
-    print(f"\n🔍 After anomaly filtering:")
+    print(f"\nAfter anomaly filtering:")
     print(f"  Anomalies: {len(anomalies)}")
     print(f"  Estimated tokens: {filtered_tokens:,}")
     print(f"  Reduction: {(1 - filtered_tokens/total_tokens)*100:.1f}%")
@@ -111,12 +111,12 @@ def demo_z_score_detection(log_file: str):
     
     stats = detector.get_stats()
     
-    print(f"📊 Detection Results:")
+    print(f"Detection Results:")
     print(f"  Total events: {stats['total_events']}")
     print(f"  Anomalies detected: {stats['anomalies_detected']}")
     print(f"  Anomaly rate: {stats['anomaly_rate']*100:.2f}%")
     
-    print(f"\n🔍 Detection methods breakdown:")
+    print(f"\nDetection methods breakdown:")
     for method, count in stats['by_method'].items():
         print(f"  {method}: {count}")
     
@@ -128,11 +128,11 @@ def demo_z_score_detection(log_file: str):
                 metric_counts[metric] = metric_counts.get(metric, 0) + 1
     
     if metric_counts:
-        print(f"\n📈 Anomalies by metric:")
+        print(f"\nAnomalies by metric:")
         for metric, count in sorted(metric_counts.items(), key=lambda x: x[1], reverse=True)[:10]:
             print(f"  {metric}: {count}")
     
-    print(f"\n📋 Sample Anomalous Events:")
+    print(f"\nSample Anomalous Events:")
     for i, (event, reasons) in enumerate(anomalies[:3], 1):
         print(f"\n  [{i}] {event.event} (Event #{event.event_id})")
         if event.fields_json:
@@ -165,14 +165,14 @@ def demo_hybrid_approach(log_file: str):
     
     combined_stats = hybrid.get_combined_stats()
     
-    print(f"📊 Stage 1: Simple Filter")
+    print(f"Stage 1: Simple Filter")
     simple_stats = combined_stats['simple_filter']
     print(f"  Total events: {simple_stats['total']}")
     print(f"  Passed filter: {simple_stats['passed']}")
     print(f"  Filtered out: {simple_stats['filtered']}")
     print(f"  Filter rate: {simple_stats['filter_rate']*100:.2f}%")
     
-    print(f"\n🔍 Stage 2: Anomaly Detection")
+    print(f"\nStage 2: Anomaly Detection")
     metric_stats = combined_stats['metric_detector']
     print(f"  Events analyzed: {metric_stats['total_events']}")
     print(f"  Anomalies detected: {metric_stats['anomalies_detected']}")
@@ -184,7 +184,7 @@ def demo_hybrid_approach(log_file: str):
     print(f"  After filtering: {token_stats['total_tokens_with_filter']:,}")
     print(f"  Reduction: {token_stats['token_reduction_rate']*100:.2f}%")
     
-    print(f"\n✅ Final output for LLM:")
+    print(f"\nFinal output for LLM:")
     print(f"  {len(anomalies)} anomalous events")
     print(f"  Ready for Claude/GPT analysis")
     

@@ -184,7 +184,7 @@ class StorageService:
         #     join event_metrics m using (event_id)
         #     group by 1,2,3;
         # """)
-        print(f"✅ Created rollups_{interval_seconds}s table with windowed aggregates")
+        print(f"Created rollups_{interval_seconds}s table with windowed aggregates")
 
     def check_events_loaded(self) -> bool:
         """Check if events have been loaded"""
