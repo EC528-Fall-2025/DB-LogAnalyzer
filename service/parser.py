@@ -87,3 +87,38 @@ class LogParser:
             raw_json=obj,
             fields_json={k: v for k, v in obj.items() if k not in MANDATORY_FIELDS}
         )
+
+    def load_event_models(self,json_path: str):
+        with open(json_path, "r") as f:
+            data = json.load(f)
+
+        events = []
+        for obj in data:
+            # Convert string timestamps → datetime
+            ts = obj["ts"]
+            if isinstance(ts, str):
+                ts = datetime.fromisoformat(ts.replace("Z", ""))
+
+            # Parse nested JSON strings if necessary
+            raw_json = json.loads(obj["raw_json"]) if isinstance(obj["raw_json"], str) else obj["raw_json"]
+            fields_json = json.loads(obj["fields_json"]) if isinstance(obj["fields_json"], str) else obj["fields_json"]
+
+            events.append(
+                EventModel(
+                    event_id=int(obj["event_id"]),
+                    ts=ts,
+                    severity=obj.get("severity"),
+                    event=obj.get("event"),
+                    process=obj.get("process"),
+                    role=obj.get("role"),
+                    pid=obj.get("pid"),
+                    machine_id=obj.get("machine_id"),
+                    address=obj.get("address"),
+                    trace_file=obj.get("trace_file"),
+                    src_line=obj.get("src_line"),
+                    raw_json=raw_json,
+                    fields_json=fields_json,
+                )
+            )
+
+        return events
