@@ -1,5 +1,5 @@
 """
-FDB Log Analyzer - FoundationDB日志分析工具
+FDB Log Analyzer - FoundationDB Log Analysis Tool
 """
 
 __version__ = "1.0.0"
