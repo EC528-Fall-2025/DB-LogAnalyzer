@@ -175,6 +175,7 @@ class AgenticLoop:
         
         return result
     
+
     def _load_events(self, log_path: str, limit: Optional[int]) -> List[EventModel]:
         """Load events from log file"""
         events = []
@@ -292,6 +293,34 @@ class AgenticLoop:
             'simple_filter': self.simple_filter.get_stats(),
             'token_savings': self.metric_detector.estimate_token_savings()
         }
+    
+    def run_on_events(self,
+                      events: List[EventModel],
+                      include_codecoverage: bool = True) -> AgenticLoopResult:
+        """Run the loop on an in-memory event list (DB, API, etc.)."""
+        result = AgenticLoopResult()
+        result.total_events = len(events)
+        if not events:
+            return result
+
+        # Step 2: filter
+        filtered_events = self._smart_filter(events)
+        result.filtered_events = len(filtered_events)
+
+        # Step 3: detect
+        recoveries = self.recovery_detector.detect_recoveries(events, include_codecoverage)
+        result.recoveries_detected = len(recoveries)
+
+        metric_anomalies = self.metric_detector.detect_anomalies(filtered_events)
+        result.anomalies_detected = len([a for a in metric_anomalies if a[1]])
+
+        # Step 4: AI
+        self._agent_generate_recommendations(metric_anomalies, recoveries, events, result)
+
+        # Step 5: stats
+        result.stats = self._compile_stats()
+        return result
+
     
     def print_results(self, result: AgenticLoopResult):
         """Print results in a readable format"""
