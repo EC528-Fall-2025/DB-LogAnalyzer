@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Low Memory",
+    "pattern": ["low_mem", "mem_low", "memory pressure", "mem <=", "storagemetrics", "memory"],
+    "solution": "Add more StorageServer (SS) roles or increase memory limits on SS processes."
+  },
+  {
+    "name": "High Latency",
+    "pattern": ["high latency", "latency >", "latencymetrics", "commit_latency", "read_latency", "p99"],
+    "solution": "Scale proxies/GRV proxies; check network hotspots; increase concurrency limits."
+  },
+  {
+    "name": "Disk Full",
+    "pattern": ["disk full", "disk usage", "diskmetrics", "free <", "95%", "no space left"],
+    "solution": "Add or rebalance storage nodes; expand volume; run data movement to relieve hot shards."
+  },
+  {
+    "name": "Version Lag",
+    "pattern": ["version lag", "tlog version", "lag >", "resolver lag", "logmetrics", "grvproxymetrics"],
+    "solution": "Add TLogs or resolvers; investigate slow disks/network causing replication backlog."
+  },
+  {
+    "name": "Coordinator Unhealthy",
+    "pattern": ["coordinator", "quorum", "cannot reach cluster controller", "coord down"],
+    "solution": "Replace/restart failed coordinators; verify network routes and cluster file correctness."
+  }
+]
