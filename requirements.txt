@@ -8,3 +8,6 @@ pydantic>=2.0.0
 # 可选依赖（用于数据导出）
 pandas>=2.0.0
 pyarrow>=14.0.0  # 用于parquet格式导出
+
+# AI Agent依赖 (核心组件)
+google-genai  # Google Gemini API - AI Agent使用Gemini 2.5 Pro作为决策中心
