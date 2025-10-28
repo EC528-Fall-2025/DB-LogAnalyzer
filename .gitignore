@@ -5,8 +5,18 @@
 *.csv
 *.json
 
+# Allow important JSONs for Sprint 3
+!agentic/runbook.json
+!samples/
+!samples/*.json
+
 # Local run folders
 experiments/
 Sprint v1.1/
 data/
 workflow_demo.duckdb
+
+# Python cache and test folders
+__pycache__/
+*.pyc
+tests/
