@@ -224,7 +224,7 @@ class ForcedRecoveryChunker:
             return False
         status_code = event.fields_json.get("StatusCode")
         try:
-            return int(status_code) == 14
+            return status_code == "14"
         except (TypeError, ValueError):
             return False
 
