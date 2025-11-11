@@ -1,0 +1,99 @@
+x,y,cluster,comment
+8.703893,10.043607,6,KeyValueStoreMemory switching to large transaction mode
+7.3032107,11.483291,1,Get tenant info raw access transaction
+8.58842,8.96143,0,Emergency transaction processing during recovery
+6.9253345,9.374842,2,Resolver first unseen version is current version
+5.912396,10.221482,2,The proxy that sent this request has the oldest current version
+6.9535594,8.40987,5,Wrote SpanContextMessage to a transaction log
+8.528907,10.06053,6,KeyValueStoreMemory switching to large transaction mode with committed data
+6.6880703,8.369989,5,No new SpanContextMessage written to transaction logs
+6.7755084,7.3998795,5,TLog moved data to persistentData
+5.732506,10.069032,2,The proxy that sent this request does not have the oldest current version
+5.273556,10.336241,4,getConsistentReadVersion received GetReadVersionReply delayed by proxy tag throttling
+4.702154,9.989057,6,Tracking transaction tag in TransactionTagCounter
+6.5324507,10.370282,7,Commit proxy failed to progress
+6.4301333,10.000547,7,Terminated due to commit proxy failure
+7.319532,10.643861,0,Waiting for dummy transaction to report commit_unknown_result
+9.05934,8.850663,0,Master recovery from pre-existing database
+6.529226,7.6967525,5,TLog stopped by recovering cluster-controller
+7.5556974,9.958726,0,Queuing post-resolution commit processing
+6.5142136,7.3814344,5,TLog recovery took more than 1 second
+5.6322303,9.835029,7,stale GRV proxy detected
+7.247781,11.273226,1,Commit of a dummy transaction in tenant keyspace
+6.8352714,11.160146,1,NativeAPI commit has tenant
+7.131994,11.729741,1,Tenant prefix prepend skipped for dummy transaction
+4.5922613,10.289832,6,throttling transaction after getting read version
+4.7728047,10.523213,4,Throttling tag before GRV request
+7.457034,11.204388,1,Illegal tenant commit to special keys module
+7.567932,12.010227,1,Tenant rename transaction tenant not found
+7.50518,11.908992,1,Tenant rename transaction ID/name mismatch
+7.528041,12.010754,1,Tenant rename transaction new name already exists
+7.413655,12.092633,1,Tenant rename transaction already applied
+7.64529,11.907249,1,Tenant rename transaction inside group
+7.341333,9.331565,0,encrypting resolver mutations
+6.600195,7.931297,5,Terminated due to tLog failure
+5.80521,9.637445,7,Terminated due to GRV proxy failure
+7.0706077,9.050108,7,Terminated due to resolver failure
+7.5582347,8.867945,0,"Coordinated state conflict, recovery terminating"
+9.247472,8.986981,3,Cluster recovery failed because of the initial commit failed
+6.7505074,11.100168,1,Commit proxy tenant not found
+6.5422764,10.911014,1,Commit proxy tenant not found waiting for min version
+6.727131,11.278049,1,Commit proxy access invalid tenant
+6.680501,11.217252,1,Commit proxy transaction tenant failure
+7.165707,11.449627,1,Tenant ID request trigger commit
+8.079521,9.775,0,"Commit proxy apply metadata mutations from txnStateStore on recovery, with encryption-at-rest enabled"
+8.617876,9.858017,0,consistency scan loop shard too large for one transaction
+8.042314,8.373281,0,DiskQueue: Recovery popped position not fully durable
+5.05187,10.245891,4,GRV proxy returning tag throttle
+5.0639424,10.280245,4,GRV proxy expiring tag throttle
+5.914794,9.178515,7,GrvProxyServer tlog failed
+4.8070245,10.476702,4,GrvProxyTagThrottler throttling transaction
+8.14277,10.104455,0,Fixing a partial commit at the end of the KeyValueStoreMemory log
+8.32467,10.044135,0,KeyValueStoreMemory recovered partial transaction while encryption-at-rest is enabled
+6.3235126,7.6255255,5,tlog peek second attempt ended at a different version
+8.307057,10.755261,0,The caller had a transaction in flight that assigned keys to the server.  Wait for it to reverse its mistake.
+8.816353,8.778383,0,Storage server already removed after retrying transaction
+5.0369916,10.252105,4,Returning tag throttles to a proxy
+7.7057548,8.796228,0,Resolver detects forced recovery
+5.8835707,10.325968,2,No outstanding batches for version on proxy
+4.512046,10.272568,6,Transaction tag manually throttled
+4.4282775,10.226127,6,Manual transaction tag throttle updated
+7.0697527,7.88137,5,Fixing a partial commit at the end of the tlog queue
+6.152076,7.426469,5,tlog peek second attempt ended at a different version (2)
+7.072811,7.450682,5,A TLog was replaced before having a chance to commit its queue
+6.826452,7.410274,5,Stopping tlog because new dbinfo has a higher recovery count
+7.147245,7.541406,5,all tlogs removed during queue recovery
+7.261843,7.619884,5,Flush excess data during TLog queue recovery
+8.3300495,8.618385,0,Restarting recovery at an earlier point
+4.42272,10.42719,4,Converting tag throttle duration to absolute time
+4.4871125,10.379755,4,Tag throttle changes detected
+4.31164,10.056843,6,Transaction tag auto-throttled
+7.641591,8.559315,0,"Coordinated state changed between writing and reading, recovery restarting"
+6.4491057,7.2887807,5,TLog degraded
+7.1359854,10.373798,0,Commit version request queued up
+6.3902674,7.8736186,5,Master: terminated due to tLog failure
+6.436749,9.786438,7,Master: terminated due to commit proxy failure
+5.855894,9.574429,7,Master: terminated due to GRV proxy failure
+6.9502883,8.988509,7,Master: terminated due to resolver failure
+8.278538,10.808694,0,it's possible that the caller had a transaction in flight that assigned keys to the server. Wait for it to reverse its mistake.
+6.3911705,7.1512694,5,EncryptionAtRestPlaintextMarkerCheckScanned TLog file scanned
+6.735881,7.6776457,5,Exclude failed tlog
+7.2873855,10.528491,0,Commit unknown result
+7.359348,10.422352,0,Commit conflict
+7.8916183,10.453696,6,incrementCheckData transaction has value
+7.753686,11.364144,1,Caught tenant map changing and normal key writing in the same transaction.
+7.0221796,11.3821335,1,conflict range tenant commit succeeded
+7.2070274,10.986877,1,conflict range tenant commit error thrown
+8.404883,10.379688,6,read transaction special keyrange
+7.847982,10.198256,0,Read write conflict range of committed transaction
+9.744178,8.865935,3,Run metacluster transaction on registering cluster
+9.684035,8.792028,3,Run metacluster transaction on removing cluster
+9.586516,8.936755,3,Run metacluster transaction on restoring cluster
+9.212173,9.007188,8,Retry management transaction with unconfigured cluster
+9.675605,9.077332,8,Run management transaction on non-management cluster
+9.461117,9.202742,8,Run management transaction on wrong management cluster
+9.5036,8.7532625,8,Run management transaction using deleted data cluster
+9.699594,9.174519,8,Run management transaction using wrong data cluster
+9.823662,9.315857,8,Run data cluster transaction on non-data cluster
+9.914784,9.223576,8,Run data cluster transaction on wrong data cluster
+9.858648,8.737896,8,Run data cluster transaction on restoring data cluster
