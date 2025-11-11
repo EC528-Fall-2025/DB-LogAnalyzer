@@ -220,12 +220,14 @@ class ForcedRecoveryChunker:
         """Return True if event is MasterRecoveryState with StatusCode 14."""
         if event.event != "MasterRecoveryState":
             return False
-        if not event.fields_json:
+        status_code = None
+        if event.fields_json:
+            status_code = event.fields_json.get("StatusCode")
+        if status_code is None:
             return False
-        status_code = event.fields_json.get("StatusCode")
-        try:
-            return status_code == "14"
-        except (TypeError, ValueError):
-            return False
+        status_str = str(status_code).strip()
+        # Remove common quote characters (straight and curved)
+        status_str = status_str.strip('"').strip('""')
+        return status_str == "14"
 
 

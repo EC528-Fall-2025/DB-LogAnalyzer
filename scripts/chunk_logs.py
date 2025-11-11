@@ -80,7 +80,11 @@ def main() -> None:
     kb_path = Path(args.knowledge_base).expanduser() if args.knowledge_base else None
     chunker = ForcedRecoveryChunker(knowledge_base_path=kb_path)
     chunk_objects = chunker.chunk_events(chunker.parser.parse_logs(str(log_path)))
-    chunk_dicts = [chunk.to_dict(include_events=args.include_events) for chunk in chunk_objects]
+    include_events = args.include_events or bool(args.output)
+    chunk_dicts = [
+        chunk.to_dict(include_events=include_events)
+        for chunk in chunk_objects
+    ]
 
     print_summaries(chunk_dicts, args.limit)
 
