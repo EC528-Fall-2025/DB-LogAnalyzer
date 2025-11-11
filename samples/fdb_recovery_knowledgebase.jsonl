@@ -1,0 +1,58 @@
+{"cluster": 0,
+ "canonical_label": "recovery_restart_cascade",
+ "representative_comment": "Emergency transaction processing during recovery",
+ "examples": [
+   "commit_unknown_result",
+   "Master recovery from pre-existing database",
+   "Coordinated conflict — restarting recovery"
+ ],
+ "recovery_phase": "During Recovery",
+ "meaning": "A recovery already in progress restarts due to conflicting coordinator state or commit ambiguity. Often triggered when multiple coordinators or masters compete during ongoing recovery, causing a cascade of restarts."
+}
+
+{"cluster": 4,
+ "canonical_label": "transaction_tag_throttling",
+ "representative_comment": "Tag throttling / GRV stall",
+ "examples": [
+   "GRV proxy returning tag throttle",
+   "Throttle before GRV request"
+ ],
+ "recovery_phase": "During Recovery",
+ "meaning": "Indicates throttling or rate-limiting in the GRV (GetReadVersion) phase. Flow control is applied when proxies or tags are congested; can cause temporary stalls but does not necessarily restart recovery."
+}
+
+{"cluster": 5,
+ "canonical_label": "tlog_failure_recovery",
+ "representative_comment": "TLog recovery + spills",
+ "examples": [
+   "TLog degraded",
+   "Partial commit fixes",
+   "Exclude failed TLog",
+   "Stopped by CC recovery"
+ ],
+ "recovery_phase": "Forced Recovery",
+ "meaning": "Signals that a Transaction Log (TLog) has failed or produced inconsistent data (e.g., partial commits, torn writes). The cluster controller forces a new recovery cycle to exclude or replace the failed TLog."
+}
+
+{"cluster": 6,
+ "canonical_label": "storage_engine_pressure",
+ "representative_comment": "KV Store internal throttling / durability",
+ "examples": [
+   "KeyValueStoreMemory switching to large txn",
+   "DiskQueue popped not durable"
+ ],
+ "recovery_phase": "Post Recovery",
+ "meaning": "Reflects I/O pressure or durability throttling after recovery completes. Usually not a failure — indicates that disk or buffer backpressure is limiting throughput once the cluster has resumed normal operation."
+}
+
+{"cluster": 7,
+ "canonical_label": "commit_proxy_pipeline_crash",
+ "representative_comment": "Commit / Proxy failures (GRV / resolver cascade)",
+ "examples": [
+   "Commit proxy failed to progress",
+   "Master terminated due to commit proxy failure",
+   "Resolver failure"
+ ],
+ "recovery_phase": "Forced Recovery",
+ "meaning": "A fatal crash in the commit or resolver pipeline triggers a cluster-wide recovery. Often results from proxy unresponsiveness or version-vector inconsistency cascading to the master process."
+}
