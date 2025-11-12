@@ -6,6 +6,7 @@ from service.agentic_loop import AgenticLoop
 from service.db import get_conn
 from service.ingest import iter_events_from_file, insert_events
 from service.repository import load_events_window
+from cli.main import CLI
 
 def main():
     parser = argparse.ArgumentParser(description="FoundationDB Log Analyzer CLI")
@@ -38,7 +39,7 @@ def main():
         parser.print_help()
 
 def run_agentic(args):
-    print(f"🚀 Agentic mode on: {args.log_path}")
+    print(f"Agentic mode on: {args.log_path}")
     loop = AgenticLoop(
         z_score_threshold=args.z,
         recovery_lookback=5.0,
@@ -50,23 +51,26 @@ def run_agentic(args):
     loop.print_results(result)
 
 def run_pipeline(args):
-    print(f"📦 Pipeline mode — ingest → DuckDB → agentic")
+    print(f"Pipeline mode — ingest → DuckDB → agentic")
     print(f"   Log: {args.log_path}")
     print(f"   DB : {args.db}")
 
     # 1) Ensure DB exists + DDL loaded
-    con = get_conn(args.db)
+    
+    cli = CLI()
+    cli_args = argparse.Namespace(
+        input=args.log_path,
+        output=args.db,
+        format="duckdb",
+        schema="data/schema.sql" if hasattr(args, "schema") else None
+    )
 
-    # 2) Ingest from file into DuckDB
-    events_iter = iter_events_from_file(args.log_path, args.limit)
-    inserted = insert_events(con, events_iter)
-    print(f"   ✓ Inserted {inserted} events")
+    cli.handle_pipeline(cli_args)
 
-    # 3) Load back from DuckDB (optionally windowed)
     loaded = load_events_window(args.db, limit=args.limit)
     print(f"   ✓ Loaded {len(loaded)} events from DuckDB")
 
-    # 4) Run agentic loop over loaded events
+    # 2) Run agentic loop over loaded events
     loop = AgenticLoop(
         z_score_threshold=args.z,
         recovery_lookback=5.0,

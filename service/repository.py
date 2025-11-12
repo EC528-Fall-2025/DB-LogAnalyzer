@@ -53,7 +53,7 @@ def load_events_window(
     lim = f"LIMIT {int(limit)}" if limit else ""
 
     q = f"""
-      SELECT id, event, ts, severity, role, fields_json
+      SELECT event_id, event, ts, severity, role, fields_json
       FROM events
       {where_clause}
       ORDER BY ts ASC
