@@ -205,9 +205,25 @@ class ForcedRecoveryChunker:
         return chunks
 
     def _is_trigger_event(self, event: EventModel) -> bool:
-        """Return True if event is a forced recovery CodeCoverage trigger."""
+        """Return True if event is a forced recovery CodeCoverage trigger with Covered=1."""
         if event.event != "CodeCoverage":
             return False
+        
+        # Check if Covered=1 (only events that actually happened)
+        if event.fields_json:
+            covered = event.fields_json.get("Covered")
+            # Handle both string and int representations
+            if covered is not None:
+                covered_str = str(covered).strip().strip('"').strip('""')
+                if covered_str != "1":
+                    return False
+            else:
+                # If Covered field is missing, skip this event
+                return False
+        else:
+            return False
+        
+        # Check if comment matches forced recovery patterns
         comment = ""
         if event.fields_json:
             comment = str(event.fields_json.get("Comment", "")).lower()
