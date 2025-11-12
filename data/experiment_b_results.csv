@@ -1,0 +1,5 @@
+timestamp,model,prompt_id,detection,reasoning,depth,clarity,answer_excerpt
+2025-10-14T15:19:11,GooseAI,Q2,5,4,4,5,It mentioned DiskMetrics and latency anomaly in the StorageProxy.
+2025-10-14T17:41:59,GooseAI,Q4,5,4,4,5,It mentioned DiskMetrics and latency anomaly in the StorageProxy.
+2025-10-14T17:42:16,Tabby,Q2,3,2,2,3,It mentioned anomalies in CommitLatencyMetrics but missed GRVProxy. It suggested possible congestion without clear reasoning.
+2025-10-14T17:42:43,Tabby,Q4,3,2,2,3,It guessed that the TLog was the source of latency but didn’t connect it clearly to DiskMetrics or VersionLag.
