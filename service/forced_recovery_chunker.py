@@ -8,6 +8,7 @@ with StatusCode 14 (fully recovered).
 from __future__ import annotations
 
 import json
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Optional, Dict, Any
@@ -74,6 +75,24 @@ class ForcedRecoveryChunk:
         payload["raw_json"] = event.raw_json
         payload["fields_json"] = event.fields_json
         return payload
+
+    def to_xml(self) -> str:
+        """Convert chunk events to XML format matching original FDB trace format."""
+        root = ET.Element("Trace")
+        
+        for event in self.events:
+            # Use raw_json which contains all original fields
+            event_elem = ET.SubElement(root, "Event")
+            
+            # Copy all attributes from raw_json, preserving original field names
+            for key, value in event.raw_json.items():
+                # Convert value to string, handling None
+                event_elem.set(key, str(value) if value is not None else "")
+        
+        # Generate XML string with declaration
+        xml_str = '<?xml version="1.0"?>\n'
+        xml_str += ET.tostring(root, encoding='unicode')
+        return xml_str
 
 
 class ForcedRecoveryChunker:
@@ -245,5 +264,81 @@ class ForcedRecoveryChunker:
         # Remove common quote characters (straight and curved)
         status_str = status_str.strip('"').strip('""')
         return status_str == "14"
+
+    def export_chunks_to_xml(
+        self,
+        log_path: str,
+        output_dir: str,
+        prefix: str = "chunk",
+        create_index: bool = True,
+    ) -> List[str]:
+        """
+        Parse log file, chunk it, and export each chunk to a separate XML file.
+
+        Args:
+            log_path: Path to input log file (XML, JSON, plaintext).
+            output_dir: Directory where chunk XML files will be written.
+            prefix: Filename prefix for chunk files (default: "chunk").
+            create_index: Whether to create an index file with chunk metadata (default: True).
+
+        Returns:
+            List of paths to created XML files.
+
+        Example:
+            chunker.export_chunks_to_xml(
+                "samples/sample1.xml",
+                "output/chunks",
+                prefix="recovery_chunk"
+            )
+            # Creates: recovery_chunk_0.xml, recovery_chunk_1.xml, ...
+            # Also creates: chunks_index.json with metadata
+        """
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        chunks = self.chunk_events(self.parser.parse_logs(log_path))
+        created_files = []
+        chunk_metadata = []
+
+        for idx, chunk in enumerate(chunks):
+            filename = f"{prefix}_{idx}.xml"
+            filepath = output_path / filename
+            
+            # Write chunk to XML file
+            with filepath.open("w", encoding="utf-8") as f:
+                f.write(chunk.to_xml())
+            
+            created_files.append(str(filepath))
+            
+            # Collect metadata
+            metadata = {
+                "chunk_index": idx,
+                "chunk_label": f"{prefix}_{idx}",
+                "xml_file": filename,
+                "source_log": Path(log_path).name,
+                "start_event_id": chunk.start_event.event_id,
+                "start_time": chunk.start_event.ts.isoformat() if chunk.start_event.ts else None,
+                "start_comment": chunk.start_comment,
+                "end_event_id": chunk.end_event.event_id if chunk.end_event else None,
+                "end_time": chunk.end_event.ts.isoformat() if chunk.end_event and chunk.end_event.ts else None,
+                "event_count": len(chunk.events),
+                "is_complete": chunk.is_complete,
+                "file_size_bytes": filepath.stat().st_size,
+            }
+            chunk_metadata.append(metadata)
+
+        # Create index file if requested
+        if create_index and chunk_metadata:
+            index_file = output_path / "chunks_index.json"
+            with index_file.open("w", encoding="utf-8") as f:
+                json.dump({
+                    "source_log": Path(log_path).name,
+                    "total_chunks": len(chunks),
+                    "output_directory": str(output_path),
+                    "chunks": chunk_metadata
+                }, f, indent=2)
+            print(f"   Index file: {index_file}")
+
+        return created_files
 
 

@@ -143,3 +143,8 @@ web/.vscode/settings.json
 wandb/
 
 logs
+
+# Generated chunk files
+chunks.json
+forced_recovery_chunks/
+output/
