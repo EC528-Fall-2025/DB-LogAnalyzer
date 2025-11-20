@@ -1,0 +1,62 @@
+[
+  {
+    "id": "disk_full",
+    "name": "Disk Full",
+    "patterns_any": ["disk full", "diskmetrics", "disk usage", "free <", "no space left", "diskdelays"],
+    "patterns_all": [],
+    "negative": ["buggifysection"],
+    "solution": "Add or rebalance storage nodes; expand volume capacity.",
+    "severity": "high",
+    "rationale": "Full or delayed disks block writes and trigger data movement."
+  },
+  {
+    "id": "high_latency",
+    "name": "High Latency / Chaos Event",
+    "patterns_any": ["chaosmetrics", "latency spike", "high latency", "latencymetrics", "commit_latency", "p99", "slow request"],
+    "patterns_all": [],
+    "negative": ["buggifysection"],
+    "solution": "Scale proxies or GRV proxies; check network hotspots or stress load.",
+    "severity": "medium",
+    "rationale": "System under chaos testing or high latency can slow transactions."
+  },
+  {
+    "id": "version_lag",
+    "name": "Version Lag on TLog",
+    "patterns_any": ["version lag detected", "resolver lag high on tlog", "logmetrics", "tlog lag", "version lag"],
+    "patterns_all": [],
+    "negative": ["buggifysection"],
+    "solution": "Add TLogs or resolvers; investigate slow disks/network causing backlog.",
+    "severity": "medium",
+    "rationale": "Large version lag slows replication and increases recovery time."
+  },
+  {
+    "id": "low_memory",
+    "name": "Low Memory",
+    "patterns_any": ["low memory", "memory pressure", "storagemetrics", "mem <="],
+    "patterns_all": [],
+    "negative": ["buggifysection"],
+    "solution": "Add more StorageServer (SS) roles or increase memory quota.",
+    "severity": "high",
+    "rationale": "Memory pressure causes queueing and recovery risk."
+  },
+  {
+    "id": "coordinator_unhealthy",
+    "name": "Coordinator Unhealthy",
+    "patterns_any": ["coordinator", "cannot reach cluster controller", "lost quorum", "coord down"],
+    "patterns_all": [],
+    "negative": ["buggifysection"],
+    "solution": "Restart/replace coordinators; verify cluster file and routes.",
+    "severity": "critical",
+    "rationale": "Coordinator loss prevents consensus; rapid recovery required."
+  },
+  {
+    "id": "recovery_complete",
+    "name": "Recovery Complete",
+    "patterns_any": ["recovery complete", "recovery finished", "cluster healthy", "coordinator resumed", "recovered"],
+    "patterns_all": [],
+    "negative": ["buggifysection"],
+    "solution": "No action. Monitor stability; verify lag returns to baseline.",
+    "severity": "low",
+    "rationale": "System indicates recovery is finished."
+  }
+]
