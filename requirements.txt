@@ -1,5 +1,5 @@
 # FDB Log Analyzer Dependencies
-# Python 3.8+
+# Python 3.10+ (required for importlib.metadata.packages_distributions)
 
 # 核心依赖
 duckdb>=0.9.0
@@ -10,4 +10,5 @@ pandas>=2.0.0
 pyarrow>=14.0.0  # 用于parquet格式导出
 
 # AI Agent依赖 (核心组件)
-google-genai  # Google Gemini API - AI Agent使用Gemini 2.5 Pro作为决策中心
+google-generativeai>=0.3.0  # Google Gemini API - AI Agent uses Gemini 2.5 Flash for analysis
+google-api-core>=2.14.0  # Core Google API client library (fixes FutureWarning and importlib compatibility)
