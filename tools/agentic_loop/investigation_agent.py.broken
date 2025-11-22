@@ -1,0 +1,35 @@
+"""
+Investigation Agent - LLM-based log analysis with tool access.
+
+Purpose: Analyze DuckDB events using LLM and investigation tools to identify root causes.
+"""
+
+import json
+import os
+import warnings
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Optional, List, Dict, Any
+
+# Suppress FutureWarning from google.api_core (dependency of google-genai)
+warnings.filterwarnings('ignore', category=FutureWarning, module='google.api_core')
+
+# Workaround for importlib.metadata.packages_distributions compatibility
+# This attribute exists in Python 3.10+, but some dependencies may access it incorrectly
+try:
+    import importlib.metadata as _metadata
+    # Ensure packages_distributions exists (Python 3.10+)
+    if not hasattr(_metadata, 'packages_distributions'):
+        # Fallback: provide a minimal implementation
+        def _packages_distributions():
+            """Fallback for packages_distributions if not available."""
+            return {}
+        _metadata.packages_distributions = _packages_distributions
+except (ImportError, AttributeError):
+    # If importlib.metadata doesn't exist at all, we can't fix it
+    pass
+
+import google.generativeai as genai
+
+from data_transfer_object.event_dto import EventModel
+from tools.investigation_tools import get_events
