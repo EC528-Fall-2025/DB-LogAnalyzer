@@ -1,17 +1,22 @@
 """
-Command-line interface for FDB Log Analyzer
+Command-line interface for FDB Log Analyzer.
 """
 import argparse
-import sys
 import os
-from pathlib import Path
-from service.storage import StorageService
-from service.parser import LogParser
-from service.chunker import TimeChunker, RoleChunker, HybridChunker
+import sys
 from collections import defaultdict
 from math import floor
+from pathlib import Path
+
+# Add project root to Python path
+_project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(_project_root))
+
 import pandas as pd
-import tiktoken 
+import tiktoken
+
+from tools.parser import LogParser
+from tools.storage import StorageService 
 
 
 class CLI:
@@ -52,21 +57,26 @@ class CLI:
         init_parser = subparsers.add_parser('init', help='Initialize database')
         init_parser.add_argument(
             '--schema',
-            default='data/schema.sql',
+            default='data_storage/schema.sql',
             help='Database schema file path'
         )
         init_parser.set_defaults(func=self.handle_init)
         
         # load command - Load logs
-        load_parser = subparsers.add_parser('load', help='Load log file(s) to database (to load mulitple, use directory)')
+        load_parser = subparsers.add_parser('load', help='Load log file(s) to database (to load multiple, use directory)')
         load_parser.add_argument(
             'log_file',
             help='Log file path (supports JSON, XML formats)'
         )
         load_parser.add_argument(
+            '--db',
+            default='fdb_logs.duckdb',
+            help='Database file path (default: fdb_logs.duckdb)'
+        )
+        load_parser.add_argument(
             '--schema',
-            default='data/schema.sql',
-            help='Database schema file path (if database does not exist)'
+            default='data_storage/schema.sql',
+            help='Database schema file path (if dat-abase does not exist)'
         )
         load_parser.add_argument(
             '--all',
@@ -75,13 +85,13 @@ class CLI:
         )
         load_parser.set_defaults(func=self.handle_load)
        
-        #chunk command - chunk logs by time window
+        # chunk command - chunk logs by time window
         chunk_parser = subparsers.add_parser('chunk', help='Chunk logs by time window')
         chunk_parser.add_argument(
             '--interval',
             type=int,
             default=300,
-            help = 'Chunking interval in seconds (default: 300 = 5 minutes)'
+            help='Chunking interval in seconds (default: 300 = 5 minutes)'
         )
         chunk_parser.add_argument(
             '--limit',
@@ -89,14 +99,6 @@ class CLI:
             default=5,
             help='Number of chunks to display (default: 5)'
         )
-
-        chunk_parser.add_argument(
-            '--mode',
-            choices=['time', 'role', 'hybrid'],
-            default='time',
-            help='Chunking mode: time-based, role-based, or hybrid (default: time)'
-        )
-
         chunk_parser.set_defaults(func=self.handle_chunk)
 
         # parse command - Parse logs (without storing)
@@ -184,10 +186,47 @@ class CLI:
         )
         rollup_parser.set_defaults(func=self.handle_rollup)
         
+        # agentic command - Run agentic loop (detect → recommend fix)
+        agentic_parser = subparsers.add_parser('agentic', help='Run agentic loop: detect anomalies → AI diagnosis → recommend fixes (Pure AI)')
+        agentic_parser.add_argument(
+            'log_file',
+            help='Log file path to analyze'
+        )
+        agentic_parser.add_argument(
+            '--limit',
+            type=int,
+            help='Maximum number of events to process (default: all)'
+        )
+        agentic_parser.add_argument(
+            '--no-codecoverage',
+            action='store_true',
+            help='Exclude CodeCoverage events (challenge mode: let AI figure out recovery causes)'
+        )
+        agentic_parser.add_argument(
+            '--z-score',
+            type=float,
+            default=2.0,
+            help='Z-score threshold for anomaly detection (default: 2.0)'
+        )
+        agentic_parser.add_argument(
+            '--output',
+            help='Output file for results (JSON format, optional)'
+        )
+        agentic_parser.add_argument(
+            '--no-ai',
+            action='store_true',
+            help='Disable AI analysis (use only rule-based detection)'
+        )
+        agentic_parser.add_argument(
+            '--api-key',
+            help='Google Gemini API key (or set GEMINI_API_KEY env var)'
+        )
+        agentic_parser.set_defaults(func=self.handle_agentic)
+        
         return parser
     
     def handle_init(self, args):
-        """Handle init command"""
+        """Handle init command."""
         print(f"Initializing database: {args.db}")
         
         service = StorageService(args.db)
@@ -204,13 +243,14 @@ class CLI:
         print("Database initialization complete!")
     
     def handle_load(self, args):
-        """Handle load command"""
-        import glob, re
+        """Handle load command."""
+        import glob
+
         # Check if log file exists
         if not os.path.exists(args.log_file):
             print(f"Error: Log file does not exist: {args.log_file}", file=sys.stderr)
             sys.exit(1)
-        
+
         print(f"Target database: {args.db}")
 
         log_dir = args.log_file
@@ -221,12 +261,12 @@ class CLI:
             if not os.path.isdir(log_dir):
                 print(f"Error: Expected a directory, got: {log_dir}", file=sys.stderr)
                 sys.exit(1)
-            
-            files_to_load = sorted(glob.glob((os.path.join(log_dir, "*.xml"))))
+
+            files_to_load = sorted(glob.glob(os.path.join(log_dir, "*.xml")))
             print(f"Following {len(files_to_load)} files loaded: {files_to_load}")
             if not files_to_load:
                 print(f"No .xml logs found in directory: {log_dir}")
-        
+
         else:
             # Single file mode
             if not os.path.isfile(log_dir):
@@ -234,15 +274,14 @@ class CLI:
                 sys.exit(1)
             files_to_load = [log_dir]
 
-
         service = StorageService(args.db)
-        
+
         # Initialize database (if needed)
         if os.path.exists(args.schema):
             service.init_db(args.schema)
         else:
             service.init_db()
-        
+
         # Check if data already exists
         if service.check_events_loaded():
             count = service.get_event_count()
@@ -250,15 +289,16 @@ class CLI:
             if response.lower() != 'y':
                 print("Operation cancelled")
                 service.close()
-                return        
-        
+                return
+
         # Load logs
         total = 0
         try:
             for file in files_to_load:
-                print(f"Loading {file}")
                 count = service.load_logs_from_file(file, event_id_offset=total)
                 total += count
+                print(f"Successfully loaded {count} events from {file}!")
+
             print(f"Successfully loaded {total} events from {len(files_to_load)} file(s)!")
         except Exception as e:
             print(f"Load failed: {e}", file=sys.stderr)
@@ -267,7 +307,7 @@ class CLI:
             service.close()
     
     def handle_parse(self, args):
-        """Handle parse command"""
+        """Handle parse command."""
         # Check if log file exists
         if not os.path.exists(args.log_file):
             print(f"Error: Log file does not exist: {args.log_file}", file=sys.stderr)
@@ -302,7 +342,7 @@ class CLI:
             sys.exit(1)
     
     def handle_query(self, args):
-        """Handle query command"""
+        """Handle query command."""
         # Get SQL query
         if args.file:
             if not os.path.exists(args.file):
@@ -343,75 +383,47 @@ class CLI:
             service.close()
     
     def handle_chunk(self, args):
-        """Handle chunk command: group events by time window, role, or hybrid"""
-
-        from service.chunker import TimeChunker, RoleChunker, HybridChunker
-
+        """Handle chunk command: group events by time window and show summary."""
         service = StorageService(args.db)
 
-        print("=" * 80)
-        print(f"CHUNKING MODE: {args.mode.upper()}")
-        print("=" * 80)
-
         try:
-            # --- Step 1: Verify database exists ---
             if not os.path.exists(args.db):
                 print(f"Error: Database does not exist: {args.db}", file=sys.stderr)
                 sys.exit(1)
-            
+
             service.init_db()
 
-            # --- Step 2: Load events from DB ---
-            query = """
-                SELECT ts, event, severity, role, machine_id 
-                FROM events 
-                WHERE ts IS NOT NULL
-            """
-            if getattr(args, "role", None):
-                query += f" AND role = '{args.role}'"
-            query += " ORDER BY ts"
-
-            df = service.query(query).df()
-
+            df = service.query(
+                "SELECT ts, event, severity, role, machine_id FROM events WHERE ts IS NOT NULL ORDER BY ts"
+            ).df()
             if df.empty:
                 print("No events with valid timestamps found.")
                 return
 
             print(f"Total events to chunk: {len(df)}")
+            interval_sec = args.interval
+            start_ts = df['ts'].min()
 
-            # --- Step 3: Convert DataFrame rows to event-like objects ---
-            events = [
-                type("Event", (), {
-                    "ts": row.ts,
-                    "event": row.event,
-                    "role": row.role,
-                    "machine_id": row.machine_id
-                })()
-                for row in df.itertuples(index=False)
-            ]
+            # Round timestamps to chunk intervals
+            def round_ts(ts):
+                delta = (ts - start_ts).total_seconds()
+                bucket = floor(delta / interval_sec)
+                return start_ts + pd.Timedelta(seconds=bucket * interval_sec)
 
-            # --- Step 4: Select chunking mode ---
-            if args.mode == "time":
-                chunker = TimeChunker(interval_seconds=args.interval)
-            elif args.mode == "role":
-                chunker = RoleChunker()
-            elif args.mode == "hybrid":
-                chunker = HybridChunker(interval_seconds=args.interval)
-            else:
-                print(f"Error: Unsupported mode '{args.mode}'", file=sys.stderr)
-                sys.exit(1)
-
-            # --- Step 5: Perform chunking ---
-            chunks = chunker.chunk(events)
+            df['chunk_time'] = df['ts'].apply(round_ts)
+            grouped = df.groupby('chunk_time')
 
             print(f"\nDisplaying first {args.limit} chunk summaries:\n")
+            encoding = tiktoken.encoding_for_model("gpt-4")
 
-            for i, chunk in enumerate(chunks[:args.limit]):
-                print(f"Chunk {i+1}: {chunk.label} → ~{chunk.estimated_tokens} tokens")
-                preview = chunk.text[:250].replace('\n', ' ')
-                print(f"  Preview: {preview}...\n")
-
-            print(f"Total chunks created: {len(chunks)}")
+            for i, (chunk_time, group) in enumerate(grouped):
+                if i >= args.limit:
+                    break
+                joined_text = "\n".join(group['event'].astype(str).tolist())
+                token_count = len(encoding.encode(joined_text))
+                print(f"🕒 Chunk {i+1}: {chunk_time} → {len(group)} events, ~{token_count} tokens")
+                print(f"  Event types: {group['event'].value_counts().to_dict()}")
+                print()
 
         except Exception as e:
             print(f"Chunking failed: {e}", file=sys.stderr)
@@ -419,10 +431,8 @@ class CLI:
         finally:
             service.close()
 
-
-        
     def handle_stats(self, args):
-        """Handle stats command"""
+        """Handle stats command."""
         service = StorageService(args.db)
         
         try:
@@ -502,7 +512,7 @@ class CLI:
             service.close()
     
     def handle_export(self, args):
-        """Handle export command"""
+        """Handle export command."""
         service = StorageService(args.db)
         
         try:
@@ -536,7 +546,7 @@ class CLI:
             service.close()
 
     def handle_pipeline(self, args):
-        """Handle pipeline command"""
+        """Handle pipeline command."""
         input_path = Path(args.input).expanduser()
         output_path = Path(args.output).expanduser()
         format_value = args.format.lower()
@@ -557,7 +567,7 @@ class CLI:
             else:
                 schema_path = schema_candidate
         else:
-            default_schema = Path('data/schema.sql')
+            default_schema = Path('data_storage/schema.sql')
             if default_schema.exists():
                 schema_path = default_schema
 
@@ -615,7 +625,7 @@ class CLI:
             service.close()
 
     def handle_rollup(self, args):
-        """Handle rollup command"""
+        """Handle rollup command."""
         service = StorageService(args.db)
         
         try:
@@ -650,6 +660,49 @@ class CLI:
         finally:
             service.close()
 
+    def handle_agentic(self, args):
+        """Handle agentic command - Run end-to-end anomaly detection and recommendation."""
+        import json
+
+        from tools.agentic_loop.agentic_loop import AgenticLoop
+        
+        # Check if log file exists
+        if not os.path.exists(args.log_file):
+            print(f"Error: Log file does not exist: {args.log_file}", file=sys.stderr)
+            sys.exit(1)
+        
+        try:
+            # Initialize agentic loop
+            loop = AgenticLoop(
+                z_score_threshold=args.z_score,
+                recovery_lookback=5.0,
+                auto_filter=True,
+                use_ai=not args.no_ai,
+                api_key=args.api_key
+            )
+            
+            # Run the loop
+            result = loop.run(
+                log_path=args.log_file,
+                limit=args.limit,
+                include_codecoverage=not args.no_codecoverage
+            )
+            
+            # Print results
+            loop.print_results(result)
+            
+            # Save to file if requested
+            if args.output:
+                with open(args.output, 'w') as f:
+                    json.dump(result.to_dict(), f, indent=2, ensure_ascii=False)
+                print(f"📄 Results saved to: {args.output}")
+            
+        except Exception as e:
+            print(f"Agentic loop failed: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
+            sys.exit(1)
+    
     @staticmethod
     def _is_supported_log_file(file_path: Path) -> bool:
         """Check if log file is a supported type"""
@@ -661,3 +714,7 @@ def cli():
     """CLI entry function"""
     cli_instance = CLI()
     cli_instance.run()
+
+
+if __name__ == "__main__":
+    cli()

@@ -1,13 +1,15 @@
 """
 Storage service for managing FDB logs in DuckDB.
 """
-import duckdb
 import json
 import os
-from typing import Optional
 from datetime import datetime
-from dto.event import EventModel
-from .parser import LogParser
+from typing import Optional
+
+import duckdb
+
+from data_transfer_object.event_dto import EventModel
+from tools.parser import LogParser
 
 
 class StorageService:
@@ -184,7 +186,7 @@ class StorageService:
         #     join event_metrics m using (event_id)
         #     group by 1,2,3;
         # """)
-        print(f"Created rollups_{interval_seconds}s table with windowed aggregates")
+        print(f"✅ Created rollups_{interval_seconds}s table with windowed aggregates")
 
     def check_events_loaded(self) -> bool:
         """Check if events have been loaded"""

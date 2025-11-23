@@ -1,5 +1,5 @@
 """
-Anomaly Detection Gate for FoundationDB Log Analysis
+Anomaly Detection Gate for FoundationDB Log Analysis.
 Purpose: Filter logs to reduce token cost before passing to LLM
 
 Based on mentor feedback:
@@ -7,10 +7,11 @@ Based on mentor feedback:
 - Use simple statistical methods (e.g., Z-score) to detect anomalies
 - Support both DuckDB aggregation and raw log filtering approaches
 """
-from typing import List, Dict, Any, Optional, Tuple
-from dto.event import EventModel
-import statistics
 import math
+import statistics
+from typing import Any, Dict, List, Optional, Tuple
+
+from data_transfer_object.event_dto import EventModel
 
 
 class MetricAnomalyDetector:

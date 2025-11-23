@@ -143,3 +143,13 @@ web/.vscode/settings.json
 wandb/
 
 logs
+*.duckdb
+data/
+data_storage/
+data_storage/
+*.duckdb
+*.db
+*.sqlite
+*.parquet
+data/
+data_storage/
