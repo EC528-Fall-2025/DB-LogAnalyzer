@@ -143,3 +143,5 @@ web/.vscode/settings.json
 wandb/
 
 logs
+
+data/
