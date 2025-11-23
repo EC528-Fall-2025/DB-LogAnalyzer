@@ -41,6 +41,19 @@ class StorageService:
         # If schema file is provided, execute SQL
         if schema_path:
             if os.path.exists(schema_path):
+                # Drop tables in reverse dependency order to handle foreign keys
+                # This ensures we can recreate tables with correct schema
+                try:
+                    self.db.execute("DROP TABLE IF EXISTS process_roles")
+                    self.db.execute("DROP TABLE IF EXISTS events_wide")
+                    self.db.execute("DROP TABLE IF EXISTS event_metrics")
+                    self.db.execute("DROP TABLE IF EXISTS events")
+                    self.db.execute("DROP TABLE IF EXISTS processes")
+                except Exception:
+                    # Ignore errors if tables don't exist
+                    pass
+                
+                # Now execute the schema
                 with open(schema_path, 'r') as f:
                     self.db.execute(f.read())
             else:
@@ -73,11 +86,15 @@ class StorageService:
         count = 0
         for event in self.parser.parse_logs(log_path):
             new_event_id = event.event_id + event_id_offset
-            self.insert_event(event, event_id_override=new_event_id)
+
+            self.insert_event(event, new_event_id)
+            self.insert_process(event)
+            self.insert_process_role(event)
             self.insert_metrics(new_event_id, event.fields_json)
             self.insert_events_wide(new_event_id, event.fields_json)
+
             count += 1
-        
+    
         return count
     
     def insert_event(self, event: EventModel, event_id_override: Optional[int] = None):
@@ -122,17 +139,149 @@ class StorageService:
             """, [str(event_id), k, val])
     
     def insert_events_wide(self, event_id: int, fields_json: dict):
-        """Insert event into wide table (includes common metrics)"""
-        # Extract known metrics
-        grv_latency = float(fields_json.get("GRVLatency", "nan")) if "GRVLatency" in fields_json else None
-        txn_volume = float(fields_json.get("TxnVolume", "nan")) if "TxnVolume" in fields_json else None
-        queue_bytes = float(fields_json.get("QueueBytes", "nan")) if "QueueBytes" in fields_json else None
-        
+            """Insert metrics into events_wide table using REAL FDB fields, safely."""
+
+            def safe_float(v):
+                try:
+                    return float(v)
+                except:
+                    return None
+
+            event_id = str(event_id)
+
+            # -----------------------------
+            # GRVLatencyMetrics
+            # -----------------------------
+            if "Mean" in fields_json and "P95" in fields_json:
+                # GRVLatencyMetrics fields are always single floats
+                grv_latency_ms = safe_float(fields_json["Mean"]) * 1000.0 if safe_float(fields_json["Mean"]) else None
+            else:
+                grv_latency_ms = None
+
+            # -----------------------------
+            # Txn volume (CommitProxy / TransactionMetrics)
+            # -----------------------------
+            txn_volume = None
+            if "Committed" in fields_json:
+                txn_volume = safe_float(fields_json["Committed"])
+            elif "Mutations" in fields_json:
+                txn_volume = safe_float(fields_json["Mutations"])
+
+            # -----------------------------
+            # Queue metrics
+            # -----------------------------
+            queue_bytes = None
+            if "BytesInput" in fields_json:
+                queue_bytes = safe_float(fields_json["BytesInput"])
+            elif "QueueSize" in fields_json:
+                queue_bytes = safe_float(fields_json["QueueSize"])
+
+            # -----------------------------
+            # Durability lag
+            # -----------------------------
+            durability_lag_s = None
+            if "DurableLag" in fields_json:
+                durability_lag_s = safe_float(fields_json["DurableLag"])
+            elif "DurableVersion" in fields_json and "Version" in fields_json:
+                v = safe_float(fields_json["Version"])
+                dv = safe_float(fields_json["DurableVersion"])
+                if v is not None and dv is not None:
+                    durability_lag_s = (v - dv) / 1e5
+
+            # -----------------------------
+            # Data movement
+            # -----------------------------
+            data_move_in_flight = safe_float(fields_json.get("InFlightBytes"))
+
+            # -----------------------------
+            # Disk queue
+            # -----------------------------
+            disk_queue_bytes = safe_float(fields_json.get("DiskQueue"))
+
+            # -----------------------------
+            # TLog KV operations
+            # -----------------------------
+            kv_ops = safe_float(fields_json.get("Ops"))
+
+            # -----------------------------
+            # Insert safely
+            # -----------------------------
+            self.db.execute("""
+                INSERT INTO events_wide (
+                    event_id, grv_latency_ms, txn_volume, queue_bytes,
+                    durability_lag_s, data_move_in_flight, disk_queue_bytes, kv_ops
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (event_id) DO UPDATE SET
+                    grv_latency_ms = excluded.grv_latency_ms,
+                    txn_volume = excluded.txn_volume,
+                    queue_bytes = excluded.queue_bytes,
+                    durability_lag_s = excluded.durability_lag_s,
+                    data_move_in_flight = excluded.data_move_in_flight,
+                    disk_queue_bytes = excluded.disk_queue_bytes,
+                    kv_ops = excluded.kv_ops
+            """, [
+                event_id, grv_latency_ms, txn_volume, queue_bytes,
+                durability_lag_s, data_move_in_flight, disk_queue_bytes, kv_ops
+            ])
+
+
+    def insert_process(self, event: EventModel):
+        """
+        Ensure process exists even if no Worker/ProcessStart events exist.
+        Many simulation logs (CloggedSideband, etc.) never emit process spawn events.
+        """
+
+        # Process key: use event.address if present; otherwise derive from Machine field.
+        pk = None
+
+        # 1. Preferred: address
+        if event.address:
+            pk = event.address
+
+        # 2. If missing, try fields_json["Machine"]
+        elif "Machine" in event.fields_json:
+            pk = event.fields_json["Machine"]
+
+        # 3. If still missing, nothing we can do
+        if not pk:
+            return
+
+        # Insert or update process row
         self.db.execute("""
-            INSERT INTO events_wide (
-                event_id, grv_latency_ms, txn_volume, queue_bytes
-            ) VALUES (?, ?, ?, ?)
-        """, [str(event_id), grv_latency, txn_volume, queue_bytes])
+            INSERT INTO processes (process_key, first_seen_ts, last_seen_ts, address)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT (process_key) DO UPDATE SET
+                last_seen_ts = excluded.last_seen_ts
+        """, [
+            pk,
+            event.ts,
+            event.ts,
+            pk
+        ])
+
+    def insert_process_role(self, event: EventModel):
+        """Attach roles to processes safely."""
+        
+        pk = None
+
+        if event.address:
+            pk = event.address
+        elif "Machine" in event.fields_json:
+            pk = event.fields_json["Machine"]
+        else:
+            return
+
+        # Skip if no role
+        if not event.role:
+            return
+
+        self.db.execute("""
+            INSERT INTO process_roles (process_key, role, start_ts)
+            VALUES (?, ?, ?)
+            ON CONFLICT DO NOTHING
+        """, [pk, event.role, event.ts])
+
     
     def create_rollups(self, interval_seconds: int = 60):
         """
