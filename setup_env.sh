@@ -4,7 +4,7 @@
 echo "🚀 Setting up FDB Log Analyzer environment..."
 
 # Set API Key
-export GEMINI_API_KEY='AIzaSyAX2I-fTJZpWkCmW4GNrJG7Pc0fzgrytEk'
+export GEMINI_API_KEY=''
 
 echo "✅ API Key configured"
 echo ""
