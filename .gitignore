@@ -144,4 +144,4 @@ wandb/
 
 logs
 
-data/
+fdb_logs.duckdb
