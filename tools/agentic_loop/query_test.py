@@ -35,6 +35,8 @@ def main():
     question = "What issue or scenario is being tested in these logs?"
     confidence_threshold = 0.8
     max_iterations = 10
+    use_rag = None
+    rag_corpus = None
     
     # Parse arguments
     i = 2
@@ -47,6 +49,15 @@ def main():
             i += 2
         elif sys.argv[i] == "--max-iterations" and i + 1 < len(sys.argv):
             max_iterations = int(sys.argv[i + 1])
+            i += 2
+        elif sys.argv[i] == "--use-rag":
+            use_rag = True
+            i += 1
+        elif sys.argv[i] == "--no-rag":
+            use_rag = False
+            i += 1
+        elif sys.argv[i] == "--rag-corpus" and i + 1 < len(sys.argv):
+            rag_corpus = sys.argv[i + 1]
             i += 2
         elif not sys.argv[i].startswith("--"):
             question = sys.argv[i]
@@ -77,7 +88,9 @@ def main():
         agent = InvestigationAgent(
             db_path=db_path,
             max_iterations=max_iterations,
-            confidence_threshold=confidence_threshold
+            confidence_threshold=confidence_threshold,
+            use_rag=use_rag,
+            rag_corpus=rag_corpus,
         )
         
         # Run investigation

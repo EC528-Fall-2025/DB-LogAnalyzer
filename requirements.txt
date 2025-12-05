@@ -12,3 +12,4 @@ pyarrow>=14.0.0  # 用于parquet格式导出
 # AI Agent依赖 (核心组件)
 google-generativeai>=0.3.0  # Google Gemini API - AI Agent uses Gemini 2.5 Flash for analysis
 google-api-core>=2.14.0  # Core Google API client library (fixes FutureWarning and importlib compatibility)
+google-cloud-aiplatform>=1.70.0  # Vertex AI (used for regional RAG retrieval)
