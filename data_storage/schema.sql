@@ -16,11 +16,25 @@ create table if not exists events (
 
 create table if not exists event_metrics (
   event_id     varchar not null,
+  event        varchar,
   metric_name  varchar not null,
   metric_value double,
   unit         varchar,            
   is_counter   boolean default false,
   primary key (event_id, metric_name)
+);
+
+create table if not exists metric_baselines (
+  metric_name varchar not null,
+  role        varchar,
+  mean        double,
+  stddev      double,
+  p95         double,
+  min         double,
+  max         double,
+  count       bigint,
+  updated_at  timestamp,
+  primary key (metric_name, role)
 );
 
 create table if not exists events_wide (

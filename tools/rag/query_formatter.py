@@ -1,10 +1,12 @@
-# Converts detector results and timeline evidence into a RAG query
+"""
+Converts detector results and timeline evidence into a RAG query (simple, non-LLM).
+"""
 
 def build_rag_query(detectors: dict, timeline: dict = None, timeline_builder: dict = None):
     lines = ["Detected problems and evidence:"]
 
-    for name, result in detectors.items():
-        if result.get("detected"):
+    for name, result in (detectors or {}).items():
+        if isinstance(result, dict) and result.get("detected"):
             lines.append(f"- {name}: {result}")
 
     if timeline:

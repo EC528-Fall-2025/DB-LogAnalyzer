@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from data_transfer_object.event_dto import EventModel
+from .helpers import _ensure_dict, _percentile
 
 
 class TimelineBuilder:
@@ -19,6 +20,7 @@ class TimelineBuilder:
         all_events: List[EventModel],
         detector_outputs: Optional[Dict[str, Any]] = None,
         hotspots: Optional[List[Dict[str, Any]]] = None,
+        recovery_episodes: Optional[List[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         """
         Build a structured, chronological timeline for the LLM.
@@ -100,6 +102,15 @@ class TimelineBuilder:
             ts = None
             if isinstance(result, dict):
                 ts = result.get("first_ts") or result.get("timestamp")
+                # special handling for baseline_window_anomalies first_anomaly bucket_start
+                if not ts and "first_anomaly" in result and isinstance(result["first_anomaly"], dict):
+                    fa = result["first_anomaly"]
+                    ts = fa.get("bucket_start") or fa.get("bucket_start_epoch")
+                    if isinstance(ts, (int, float)):
+                        ts = datetime.fromtimestamp(ts)
+                # storage_engine_pressure first_high_ts
+                if not ts and result.get("first_high_ts"):
+                    ts = result.get("first_high_ts")
             if ts:
                 detector_marks.append({
                     "t": rel(ts) if hasattr(ts, "isoformat") else ts,
@@ -122,6 +133,24 @@ class TimelineBuilder:
             root_signal = "storage_pressure_precedes_recovery"
         elif first_recovery:
             root_signal = "recovery_precedes_storage_pressure"
+
+        # Recovery episodes (if provided)
+        recovery_marks = []
+        if recovery_episodes:
+            for ep in recovery_episodes:
+                start = ep.get("start")
+                if isinstance(start, str):
+                    try:
+                        start = datetime.fromisoformat(start)
+                    except Exception:
+                        start = None
+                if start:
+                    recovery_marks.append({
+                        "t": rel(start),
+                        "event": "RecoveryEpisode",
+                        "note": f"Recovery window ({ep.get('duration_seconds')}s)",
+                    })
+        timeline_items.extend(recovery_marks)
 
         return {
             "first_anomaly": {

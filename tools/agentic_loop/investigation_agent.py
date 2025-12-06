@@ -21,11 +21,13 @@ from tools.investigation_tools import (
     HotspotSelector,
     ContextAnalyzer,
     Detectors,
+    TimelineBuilder,
 )
 from tools.rag.query_formatter import build_rag_query
 from tools.rag.rag_client import RAGClient
-from tools.timeline_builder import TimelineBuilder
+from tools.agentic_loop.llm_input_logger import write_llm_input, write_llm_output
 
+# FoundationDB recovery cluster knowledge base (used as static context alongside RAG).
 FDB_KNOWLEDGE_BASE = """
 # FoundationDB Recovery Cluster Knowledge Base
 
@@ -272,6 +274,7 @@ class InvestigationAgent:
         self.rag_client: Optional[RAGClient] = None
         self.timeline_summary: Optional[Dict[str, Any]] = None
         self.timeline_builder = TimelineBuilder(db_path)
+        self._last_det_results: Dict[str, Any] = {}
 
         # Unified tools
         self.scanner = GlobalScanner(db_path)
@@ -403,6 +406,28 @@ than over-interpreting isolated injected-fault events.
         note = f"\n\n[Context truncated to {limit} characters to satisfy token limits.]"
         return truncated + note
 
+    def _summarize_for_rag(self, query_text: str, api_key: Optional[str]) -> Optional[str]:
+        """
+        Use a lightweight LLM pass to compress the detector/timeline text for RAG retrieval.
+        Returns a summarized query or None if summarization failed.
+        """
+        if not query_text:
+            return None
+        try:
+            genai.configure(api_key=api_key or os.getenv("GEMINI_API_KEY"))
+            model = genai.GenerativeModel("gemini-2.5-flash")
+            prompt = (
+                "Summarize the following detector/timeline evidence into a concise retrieval query (<=800 chars). "
+                "Keep explicit problem names, metrics, and any cluster IDs. Output plain text, bullet-style."
+            )
+            resp = model.generate_content([prompt, query_text])
+            text = (resp.text or "").strip()
+            if text:
+                return text
+        except Exception as e:
+            print(f"   ⚠️  RAG summarizer failed, using raw query. Error: {e}")
+        return None
+
     def _run_rag_retrieval(
         self,
         det_results: Dict[str, Any],
@@ -427,8 +452,20 @@ than over-interpreting isolated injected-fault events.
                 self.use_rag = False
                 return False
 
-        query_text = build_rag_query(det_results or {}, timeline or {}, self.timeline_summary)
+        query_text_raw = build_rag_query(det_results or {}, timeline or {}, self.timeline_summary)
+        summarized_query = self._summarize_for_rag(query_text_raw, api_key)
+        if not summarized_query:
+            msg = "RAG summarizer unavailable; skipping RAG retrieval to avoid sending raw detector/timeline text."
+            print(f"   ⚠️  {msg}")
+            self._record_additional_data(additional_data, "rag_error", msg)
+            return False
+        query_text = summarized_query
         print("\n📚 Querying RAG corpus with detector summary...")
+        print("   Using LLM-summarized RAG query.")
+        try:
+            print(f"   RAG query (summarized): {query_text}")
+        except Exception:
+            pass
 
         try:
             rag_response = self.rag_client.retrieve(query_text)
@@ -470,7 +507,7 @@ than over-interpreting isolated injected-fault events.
                 additional_data,
                 "rag_retrieval",
                 {
-                    "query": query_text,
+                    "query_summarized": summarized_query,
                     "response_text": rag_text,
                     "raw_chunks": raw_chunks,
                 }
@@ -745,6 +782,8 @@ You are given:
 {events_text}
 
 Your job is to identify the most likely issue/scenario being tested and explain it.
+Always include the best-matching CLUSTER ID(s) in the hypothesis text (e.g., "CLUSTER 6: ..."). You may list multiple clusters if the evidence supports more than one.
+If you cannot map to a cluster, say "cluster unknown" explicitly.
 
 QUESTION: {question}
 
@@ -752,7 +791,7 @@ IMPORTANT:
 The JSON format MUST remain exactly:
 
 {{
-  "hypothesis": "Single most likely scenario (you may mention the relevant CLUSTER number inline can be more than one cluster)",
+  "hypothesis": "Single most likely scenario (must mention the relevant CLUSTER number(s) inline; may list multiple clusters if appropriate)",
   "confidence": 0.0,
   "reasoning": "Grounded explanation referencing only REAL events and metrics",
   "suggested_tools": [],
@@ -760,7 +799,7 @@ The JSON format MUST remain exactly:
 }}
 
 - Do NOT add fields like `cluster_id` or `cluster_name`.
-- You may mention cluster numbers in the hypothesis text.
+- Hypothesis MUST cite the cluster number(s) if identifiable; otherwise say 'cluster unknown'.
 - Base your confidence on how well metrics + events align with a specific failure scenario.
 {tools_used_str}
 """
@@ -921,6 +960,7 @@ The JSON format MUST remain exactly:
         iteration = 0
         context_dirty = True
         llm_calls = 0
+        hotspot_inspected = False
 
         print(f"\n🔍 Investigating: {initial_question}")
         print(f"   Target confidence: {self.confidence_threshold:.2f}")
@@ -959,14 +999,14 @@ The JSON format MUST remain exactly:
                 print(f"   Severity distribution: {sev_counts}")
 
                 # 3) Event histogram
-                print("\n3️⃣  Event histogram (top 10)...")
+                print("\n3) Event histogram (top 10)...")
                 histogram = self.scanner.event_histogram(limit=10)
                 tools_used.append("GlobalScanner.event_histogram")
                 self._record_additional_data(all_additional_data, "event_histogram", histogram)
                 print(f"   Top event types: {list(histogram.items())[:5]}")
 
                 # 4) Time span
-                print("\n4️⃣  Time span...")
+                print("\n4) Time span...")
                 span = self.scanner.time_span()
                 tools_used.append("GlobalScanner.time_span")
                 self._record_additional_data(all_additional_data, "time_span", span)
@@ -974,7 +1014,7 @@ The JSON format MUST remain exactly:
                 print(f"   Duration (s): {span.get('duration_seconds')}")
 
                 # 5) Bucket heatmap
-                print("\n5️⃣  Bucket heatmap (max severity per bucket)...")
+                print("\n5)  Bucket heatmap (max severity per bucket)...")
                 buckets = self.scanner.bucket_heatmap(bucket_seconds=300, limit=100)
                 tools_used.append("GlobalScanner.bucket_heatmap")
                 self._record_additional_data(all_additional_data, "bucket_heatmap", buckets)
@@ -985,7 +1025,7 @@ The JSON format MUST remain exactly:
                         inspected_buckets.append(int(b["bucket_start_epoch"]))
 
                 # 6) Global summary
-                print("\n6️⃣  Global summary...")
+                print("\n6)  Global summary...")
                 summary = self.scanner.global_summary()
                 tools_used.append("GlobalScanner.global_summary")
                 self._record_additional_data(all_additional_data, "global_summary", summary)
@@ -993,7 +1033,8 @@ The JSON format MUST remain exactly:
                 print(f"   Max severity: {summary.get('max_severity')}")
                 print(f"   Top event types: {summary.get('event_histogram', {})}")
 
-                print("\n7️⃣  Rollback analysis (version drops/resets/recovery-regressions)...")
+                # 7) Rollback Analysis
+                print("\n7)  Rollback analysis (version drops/resets/recovery-regressions)...")
                 rollback_info = self.scanner.rollback_analysis()
                 tools_used.append("GlobalScanner.rollback_analysis")
                 self._record_additional_data(all_additional_data, "rollback_analysis", rollback_info)
@@ -1001,6 +1042,28 @@ The JSON format MUST remain exactly:
                     f"drops={rollback_info.get('num_drops')}, "
                     f"resets={rollback_info.get('num_resets')}, "
                     f"rv_resets={rollback_info.get('num_recovery_resets')}")
+
+
+                # 8) Metric Baselines
+                print("\n8)  Metric baselines (persist + summarize)...")
+                try:
+                    baseline_info = self.scanner.upsert_metric_baselines(min_count=20, top_n=500, per_role=True)
+                    tools_used.append("GlobalScanner.upsert_metric_baselines")
+                    self._record_additional_data(all_additional_data, "metric_baselines_upsert", baseline_info)
+                    print(f"   Baselines upserted: {baseline_info.get('upserted')}")
+                except Exception as e:
+                    print(f"   ⚠️  metric_baselines error: {e}")
+                
+                #9) Recovery Episodes
+                print("\n9)  Recovery episodes (grouped recoveries)...")
+                try:
+                    recovery_eps = self.scanner.recovery_episodes()
+                    tools_used.append("GlobalScanner.recovery_episodes")
+                    self._record_additional_data(all_additional_data, "recovery_episodes", recovery_eps)
+                    print(f"   Recovery episodes: {recovery_eps.get('count')}")
+                except Exception as e:
+                    print(f"   ⚠️  recovery_episodes error: {e}")
+                    recovery_eps = None
 
                 bucket_data = buckets
                 timeline_highlights = {
@@ -1015,15 +1078,99 @@ The JSON format MUST remain exactly:
                         for b in buckets[:5]
                     ] if buckets else [],
                     "rollback_detected": rollback_info.get("detected") if rollback_info else None,
+                    "recovery_episodes": recovery_eps.get("episodes") if recovery_eps else None,
                 }
 
                 phase = "B"
-                print("\n✅ Phase A complete. Moving to Phase B.")
+                print("\nPhase A complete. Moving to Phase B.")
+                print(f"   Additional data records so far: {len(all_additional_data)}")
+
+
                 context_dirty = True
-                
+                # Defer LLM until Phase B iteration
+                continue
+
 
             # -------------------------
-            # LLM Analysis (if needed)
+            # Phase C: Coverage -> Detectors (run hotspots first)
+            # -------------------------
+            # -------------------------
+            # Global detectors first
+            # -------------------------
+            print("\n🧪 Running core detectors (global only before hotspot dive)...")
+            det_results = {}
+            try:
+                det_results["storage_engine_pressure"] = self.detectors.storage_engine_pressure()
+                tools_used.append("Detectors.storage_engine_pressure(global)")
+                print("   ➜ Detectors.storage_engine_pressure(global)")
+            except Exception as e:
+                print(f"   ⚠️  storage_engine_pressure(global) error: {e}")
+            try:
+                det_results["recovery_loop"] = self.detectors.recovery_loop()
+                tools_used.append("Detectors.recovery_loop(global)")
+                print("   ➜ Detectors.recovery_loop(global)")
+            except Exception as e:
+                print(f"   ⚠️  recovery_loop(global) error: {e}")
+            try:
+                det_results["ratekeeper_throttling"] = self.detectors.ratekeeper_throttling()
+                tools_used.append("Detectors.ratekeeper_throttling(global)")
+                print("   ➜ Detectors.ratekeeper_throttling(global)")
+            except Exception as e:
+                print(f"   ⚠️  ratekeeper_throttling(global) error: {e}")
+            try:
+                det_results["missing_tlogs"] = self.detectors.missing_tlogs()
+                tools_used.append("Detectors.missing_tlogs(global)")
+                print("   ➜ Detectors.missing_tlogs(global)")
+            except Exception as e:
+                print(f"   ⚠️  missing_tlogs(global) error: {e}")
+            try:
+                det_results["coordination_loss"] = self.detectors.coordination_loss()
+                tools_used.append("Detectors.coordination_loss(global)")
+                print("   ➜ Detectors.coordination_loss(global)")
+            except Exception as e:
+                print(f"   ⚠️  coordination_loss(global) error: {e}")
+            try:
+                det_results["zscore_hotspots"] = self.detectors.zscore_hotspots()
+                tools_used.append("Detectors.zscore_hotspots(global)")
+                print("   ➜ Detectors.zscore_hotspots(global)")
+            except Exception as e:
+                print(f"   ⚠️  zscore_hotspots(global) error: {e}")
+            try:
+                det_results["baseline_window_anomalies"] = self.detectors.baseline_window_anomalies()
+                tools_used.append("Detectors.baseline_window_anomalies(global)")
+                print("   ➜ Detectors.baseline_window_anomalies(global)")
+            except Exception as e:
+                print(f"   ⚠️  baseline_window_anomalies(global) error: {e}")
+            try:
+                det_results["metric_anomalies"] = self.detectors.metric_anomalies()
+                tools_used.append("Detectors.metric_anomalies(global)")
+                print("   ➜ Detectors.metric_anomalies(global)")
+            except Exception as e:
+                print(f"   ⚠️  metric_anomalies(global) error: {e}")
+
+            self._record_additional_data(all_additional_data, "detectors", det_results)
+            self._last_det_results = det_results
+
+            # Build timeline after detectors + buckets
+            try:
+                self.timeline_summary = self.timeline_builder.build(
+                    all_events,
+                    det_results,
+                    bucket_data,
+                    timeline_highlights.get("recovery_episodes") if timeline_highlights else None,
+                )
+                if self.timeline_summary:
+                    self._record_additional_data(all_additional_data, "timeline_builder", self.timeline_summary)
+                    context_dirty = True
+            except Exception as e:
+                print(f"   ⚠️  timeline_builder error: {e}")
+
+            rag_added = self._run_rag_retrieval(det_results, timeline_highlights, all_additional_data, api_key, tools_used)
+            if rag_added:
+                context_dirty = True
+
+            # -------------------------
+            # LLM Analysis (after detectors/RAG)
             # -------------------------
             analysis = {
                 "hypothesis": hypothesis or "",
@@ -1044,7 +1191,7 @@ The JSON format MUST remain exactly:
                     additional_text = "\n\nAdditional Investigation Data:\n" + "\n".join(
                         [
                             f"\n{tool_name}:\n{json.dumps(data, indent=2, default=str)}"
-                            for tool_name, data in all_additional_data[-5:]
+                            for tool_name, data in all_additional_data
                         ]
                     )
                     events_text += additional_text
@@ -1053,6 +1200,13 @@ The JSON format MUST remain exactly:
                     events_text += "\n\nTimeline Builder:\n" + json.dumps(self.timeline_summary, indent=2, default=str)
 
                 events_text = self._enforce_context_limit(events_text)
+
+                try:
+                    path = write_llm_input(events_text)
+                    if path:
+                        print(f"   LLM input written to: {path}")
+                except Exception as e:
+                    print(f"   ⚠️  llm_input_logger error: {e}")
 
                 print(f"\n🤖 Analyzing with LLM (call {llm_calls + 1}/{self.max_llm_calls})...")
                 print(f"   Current confidence: {confidence:.2f}")
@@ -1068,6 +1222,13 @@ The JSON format MUST remain exactly:
                     tools_used,
                     api_key
                 )
+                # Persist LLM output to file
+                try:
+                    out_path = write_llm_output(json.dumps(analysis, indent=2, default=str))
+                    if out_path:
+                        print(f"   LLM output written to: {out_path}")
+                except Exception as e:
+                    print(f"   ⚠️  llm_output_logger error: {e}")
                 llm_calls += 1
                 context_dirty = False
 
@@ -1079,87 +1240,51 @@ The JSON format MUST remain exactly:
             print(f"   Confidence: {confidence:.2f} (target: {self.confidence_threshold:.2f})")
             print(f"   Hypothesis: {hypothesis[:150]}...")
 
-            # If confidence already high and coverage is done, we can stop
-            if confidence >= self.confidence_threshold and coverage_complete:
-                print("\n✅ Confidence threshold reached and coverage complete.")
-                break
-
             # -------------------------
-            # Phase C: Detectors + Coverage
+            # Hotspot dive (z-score guided) after LLM if confidence low
             # -------------------------
-            print("\n🧪 Running core detectors (Detectors)...")
-            det_results = {}
-
+            chosen_bucket = None
             try:
-                det_results["storage_engine_pressure"] = self.detectors.storage_engine_pressure()
-                tools_used.append("Detectors.storage_engine_pressure")
-            except Exception as e:
-                print(f"   ⚠️  storage_engine_pressure error: {e}")
+                # Prefer z-score hotspots from detectors
+                zhot = det_results.get("zscore_hotspots", {})
+                if zhot.get("detected") and zhot.get("hotspots"):
+                    chosen_bucket = zhot["hotspots"][0]
+                    print("   Using z-score hotspot for next dive.")
+            except Exception:
+                pass
 
-            try:
-                det_results["recovery_loop"] = self.detectors.recovery_loop()
-                tools_used.append("Detectors.recovery_loop")
-            except Exception as e:
-                print(f"   ⚠️  recovery_loop error: {e}")
+            if not chosen_bucket:
+                print("\n🔍 Checking for uncovered high-severity buckets (HotspotSelector)...")
+                uncovered = []
+                try:
+                    uncovered = self.hotspots.get_uncovered(
+                        inspected_buckets,
+                        min_severity=10,
+                        bucket_seconds=10,
+                    )
+                    tools_used.append("HotspotSelector.get_uncovered")
+                except Exception as e:
+                    print(f"   ⚠️  get_uncovered error: {e}")
+                if uncovered:
+                    chosen_bucket = uncovered[0]
 
-            try:
-                det_results["ratekeeper_throttling"] = self.detectors.ratekeeper_throttling()
-                tools_used.append("Detectors.ratekeeper_throttling")
-            except Exception as e:
-                print(f"   ⚠️  ratekeeper_throttling error: {e}")
-
-            try:
-                det_results["missing_tlogs"] = self.detectors.missing_tlogs()
-                tools_used.append("Detectors.missing_tlogs")
-            except Exception as e:
-                print(f"   ⚠️  missing_tlogs error: {e}")
-
-            try:
-                det_results["coordination_loss"] = self.detectors.coordination_loss()
-                tools_used.append("Detectors.coordination_loss")
-            except Exception as e:
-                print(f"   ⚠️  coordination_loss error: {e}")
-
-            self._record_additional_data(all_additional_data, "detectors", det_results)
-            context_dirty = True
-
-            rag_added = self._run_rag_retrieval(det_results, timeline_highlights, all_additional_data, api_key, tools_used)
-            if rag_added:
-                context_dirty = True
-
-            # Build timeline after detectors + buckets
-            try:
-                self.timeline_summary = self.timeline_builder.build(all_events, det_results, bucket_data)
-                if self.timeline_summary:
-                    self._record_additional_data(all_additional_data, "timeline_builder", self.timeline_summary)
-                    context_dirty = True
-            except Exception as e:
-                print(f"   ⚠️  timeline_builder error: {e}")
-
-            # -------------------------
-            # Phase B/C: Hotspot coverage with HotspotSelector + ContextAnalyzer
-            # -------------------------
-            print("\n🔍 Checking for uncovered high-severity buckets (HotspotSelector)...")
-            uncovered = []
-            try:
-                uncovered = self.hotspots.get_uncovered(
-                    inspected_buckets,
-                    min_severity=20,
-                    bucket_seconds=600
-                )
-                tools_used.append("HotspotSelector.get_uncovered")
-            except Exception as e:
-                print(f"   ⚠️  get_uncovered error: {e}")
-
-            if uncovered:
-                print(f"   Found {len(uncovered)} uncovered buckets with severity >= 20")
-                top_bucket = uncovered[0]
-                bucket_epoch = int(top_bucket["bucket_start_epoch"])
-                bucket_start = datetime.fromtimestamp(bucket_epoch)
-                bucket_seconds = 600
+            if chosen_bucket:
+                bucket_epoch = int(chosen_bucket["bucket_start_epoch"])
+                bucket_start = datetime.utcfromtimestamp(bucket_epoch)
+                bucket_seconds = 10
+                window_start = bucket_start
+                window_end = bucket_start + timedelta(seconds=bucket_seconds)
                 around_time = bucket_start + timedelta(seconds=bucket_seconds / 2)
 
-                print(f"   Inspecting bucket starting at {bucket_start.isoformat()}")
+                print(f"\n   Inspecting bucket starting at {bucket_start.isoformat()}")
+                try:
+                    dbg_count = self.ctx.con.execute(
+                        "SELECT COUNT(*) FROM events WHERE ts BETWEEN ? AND ?",
+                        [window_start, window_end],
+                    ).fetchone()[0]
+                    print(f"   Window row count (ts between {window_start} and {window_end}): {dbg_count}")
+                except Exception as e:
+                    print(f"   ⚠️  window count debug failed: {e}")
 
                 try:
                     bucket_events = self.ctx.context_window(
@@ -1171,12 +1296,18 @@ The JSON format MUST remain exactly:
                     if self._append_events(all_events, bucket_events):
                         context_dirty = True
                     inspected_buckets.append(bucket_epoch)
-                    print(f"   Added {len(bucket_events)} events from uncovered bucket")
+                    print(f"   Added {len(bucket_events)} events from hotspot bucket")
+                    hotspot_inspected = True
                 except Exception as e:
                     print(f"   ⚠️  context_window error: {e}")
             else:
-                print("   ✅ No remaining uncovered buckets with severity >= 20")
+                print("\n   ✅ No remaining hotspots/buckets to inspect.")
                 coverage_complete = True
+
+            # If confidence already high, stop early (but ensure at least one hotspot inspected if available)
+            if confidence >= self.confidence_threshold and (hotspot_inspected or coverage_complete):
+                print("\n✅ Confidence threshold reached; stopping iterations.")
+                break
 
             # If we've hit max iterations, stop
             if iteration >= self.max_iterations:
@@ -1186,61 +1317,108 @@ The JSON format MUST remain exactly:
         # ============================
         # Final Reporting
         # ============================
-        print(f"\n{'='*70}")
-        print(f"✅ Investigation Complete")
-        print(f"{'='*70}")
-        print(f"   Final Hypothesis: {hypothesis}")
-        print(f"   Final Confidence: {confidence:.2f}")
-        print(f"   Reasoning: {reasoning}")
-        print(f"   Tools Used: {', '.join(tools_used)}")
-        print(f"   Iterations: {iteration}")
-
-        evidence_events = all_events[:50]
-
-        print(f"\n{'='*70}")
-        print(f"📋 Evidence Events ({len(evidence_events)} events)")
-        print(f"{'='*70}")
-
-        if evidence_events:
-            sorted_evidence = sorted(evidence_events, key=lambda e: (
-                -(e.severity or 0) if (e.severity or 0) >= 40 else -1000,
-                e.ts if e.ts else datetime.max
-            ))
-
-            for i, event in enumerate(sorted_evidence, 1):
-                timestamp_str = event.ts.isoformat() if event.ts else "N/A"
-                role_str = event.role or "N/A"
-
-                severity_label = ""
-                if (event.severity or 0) >= 40:
-                    severity_label = " ⚠️ ERROR"
-                elif (event.severity or 0) == 20:
-                    severity_label = " ⚠️ WARNING"
-
-                print(f"\n[{i}] Event: {event.event}{severity_label}")
-                print(f"     Timestamp: {timestamp_str}")
-                print(f"     Severity: {event.severity}")
-                print(f"     Role: {role_str}")
-
-                if event.fields_json:
-                    key_fields = {}
-                    for key, value in list(event.fields_json.items())[:5]:
-                        val_str = str(value)
-                        if len(val_str) > 100:
-                            val_str = val_str[:100] + "..."
-                        key_fields[key] = val_str
-
-                    if key_fields:
-                        print(f"     Key Fields:")
-                        for key, value in key_fields.items():
-                            print(f"       {key}: {value}")
-                else:
-                    print("     No fields_json.\n")
-
+        self._print_structured_report(hypothesis, confidence, reasoning, self.timeline_summary, self._last_det_results, all_additional_data)
         return InvestigationResult(
             hypothesis=hypothesis or "",
             confidence=confidence,
             reasoning=reasoning,
             tools_used=tools_used,
-            evidence_events=evidence_events
+            evidence_events=[]
         )
+
+    # ======================================================
+    # STRUCTURED RCA OUTPUT
+    # ======================================================
+    def _print_structured_report(
+        self,
+        hypothesis: str,
+        confidence: float,
+        reasoning: str,
+        timeline: Optional[Dict[str, Any]],
+        det_results: Dict[str, Any],
+        additional_data: List[tuple],
+    ):
+        """Print final RCA in compact hypothesis/confidence/cluster form."""
+        rag_block = next((d for d in additional_data if d[0] == "rag_retrieval"), None)
+        rag_text = ""
+        if rag_block and isinstance(rag_block[1], dict):
+            rag_text = rag_block[1].get("response_text") or rag_block[1].get("response", "")
+
+        def _collect_citations(det: Dict[str, Any]) -> list:
+            cites = []
+            # storage_engine_pressure anomalies
+            sp = det.get("storage_engine_pressure", {}) if det else {}
+            for a in sp.get("anomalies_sample", [])[:2]:
+                cites.append({
+                    "ts": a.get("ts"),
+                    "event": "StorageMetrics",
+                    "note": f"VersionLag={a.get('value')}, z={a.get('zscore')}"
+                })
+            # ratekeeper events
+            rk = det.get("ratekeeper_throttling", {}) if det else {}
+            for e in rk.get("events", [])[:2]:
+                cites.append({
+                    "ts": e.get("timestamp"),
+                    "event": e.get("event"),
+                    "note": f"fields={e.get('fields')}"
+                })
+            # missing tlogs
+            mt = det.get("missing_tlogs", {}) if det else {}
+            for e in mt.get("events", [])[:2]:
+                cites.append({
+                    "ts": e.get("timestamp"),
+                    "event": e.get("event"),
+                    "note": f"sev={e.get('severity')}"
+                })
+            # baseline anomalies
+            ba = det.get("baseline_window_anomalies", {}) if det else {}
+            for a in ba.get("anomalies", [])[:1]:
+                cites.append({
+                    "ts": a.get("bucket_start"),
+                    "event": "MetricBaselineZ",
+                    "note": f"{a.get('metric')} z={a.get('zscore')} role={a.get('role')}"
+                })
+            # metric anomalies sample
+            ma = det.get("metric_anomalies", {}) if det else {}
+            for a in ma.get("sample", [])[:1]:
+                cites.append({
+                    "ts": a.get("ts"),
+                    "event": a.get("metric"),
+                    "note": f"z={a.get('z_score')} val={a.get('value')}"
+                })
+            # keep top few
+            return cites[:5]
+
+        citations = _collect_citations(det_results or {})
+
+        print("\n" + "=" * 70)
+        print("RCA Summary")
+        print("=" * 70)
+        print(f"Hypothesis: {hypothesis}")
+        print(f"Confidence: {confidence:.2f}")
+        if timeline and timeline.get("timeline"):
+            first_anom = timeline.get("first_anomaly")
+            if first_anom:
+                print(f"First anomaly: {first_anom}")
+            print("Timeline (top 5):")
+            for item in timeline["timeline"][:5]:
+                print(f"  {item.get('t')}: {item.get('event')} — {item.get('note')}")
+
+        if citations:
+            print("\nCitations (log/metric snippets):")
+            for c in citations:
+                print(f"  [{c.get('ts')}] {c.get('event')}: {c.get('note')}")
+
+        print("\nSuggested fixes:")
+        print("  - Check storage server I/O and backlog (VersionLag, disk queue) if storage pressure is detected.")
+        print("  - Investigate TLog health (SharedTLogFailed/TLogError) and disk I/O if TLog failures appear.")
+        print("  - Examine recovery loops frequency and quiet database failures; stabilize before config changes.")
+
+        print("\nSuggested commands (run in DuckDB or shell):")
+        print("  duckdb <db_path> \"SELECT ts, event, severity, fields_json FROM events WHERE severity>=20 ORDER BY ts LIMIT 20;\"")
+        print("  duckdb <db_path> \"SELECT ts, role, fields_json->>'VersionLag' AS versionlag FROM events WHERE event='StorageMetrics' ORDER BY ts DESC LIMIT 20;\"")
+        print("  duckdb <db_path> \"SELECT ts, event, severity, fields_json FROM events WHERE event LIKE 'QuietDatabase%' ORDER BY ts LIMIT 20;\"")
+        print("  duckdb <db_path> \"SELECT ts, event, severity, fields_json FROM events WHERE event LIKE '%TLog%' AND severity>=10 ORDER BY ts LIMIT 20;\"")
+
+        # Add a blank line before tools to improve readability if upstream prints them
+        print()

@@ -90,7 +90,7 @@ class StorageService:
             self.insert_event(event, new_event_id)
             self.insert_process(event)
             self.insert_process_role(event)
-            self.insert_metrics(new_event_id, event.fields_json)
+            self.insert_metrics(new_event_id, event.event, event.fields_json)
             self.insert_events_wide(new_event_id, event.fields_json)
 
             count += 1
@@ -125,7 +125,7 @@ class StorageService:
             json.dumps(row["fields_json"])
         ])
     
-    def insert_metrics(self, event_id: int, fields_json: dict):
+    def insert_metrics(self, event_id: int, event_name: str, fields_json: dict):
         """Insert event metrics into metrics table"""
         for k, v in fields_json.items():
             try:
@@ -134,18 +134,44 @@ class StorageService:
                 continue  # Skip non-numeric types
             
             self.db.execute("""
-                INSERT INTO event_metrics (event_id, metric_name, metric_value)
-                VALUES (?, ?, ?)
-            """, [str(event_id), k, val])
+                INSERT INTO event_metrics (event_id, event, metric_name, metric_value)
+                VALUES (?, ?, ?, ?)
+            """, [str(event_id), event_name, k, val])
     
     def insert_events_wide(self, event_id: int, fields_json: dict):
             """Insert metrics into events_wide table using REAL FDB fields, safely."""
 
             def safe_float(v):
-                try:
-                    return float(v)
-                except:
+                """Parse numeric-ish values; if space-separated, take the max of numeric tokens ignoring -1."""
+                if v is None:
                     return None
+                if isinstance(v, (int, float)):
+                    try:
+                        return float(v)
+                    except Exception:
+                        return None
+                if isinstance(v, str):
+                    parts = v.split()
+                    nums = []
+                    for p in parts:
+                        if p.lower() in {"inf", "nan"}:
+                            continue
+                        try:
+                            num = float(p)
+                            nums.append(num)
+                        except Exception:
+                            continue
+                    if nums:
+                        # drop sentinel -1 if there are other values
+                        cleaned = [n for n in nums if n != -1]
+                        if cleaned:
+                            nums = cleaned
+                        return max(nums)
+                    try:
+                        return float(v)
+                    except Exception:
+                        return None
+                return None
 
             event_id = str(event_id)
 
@@ -155,6 +181,10 @@ class StorageService:
             if "Mean" in fields_json and "P95" in fields_json:
                 # GRVLatencyMetrics fields are always single floats
                 grv_latency_ms = safe_float(fields_json["Mean"]) * 1000.0 if safe_float(fields_json["Mean"]) else None
+            elif "GRVLatency" in fields_json:
+                grv_latency_ms = safe_float(fields_json["GRVLatency"])
+            elif "grvLatency" in fields_json:
+                grv_latency_ms = safe_float(fields_json["grvLatency"])
             else:
                 grv_latency_ms = None
 
@@ -166,6 +196,10 @@ class StorageService:
                 txn_volume = safe_float(fields_json["Committed"])
             elif "Mutations" in fields_json:
                 txn_volume = safe_float(fields_json["Mutations"])
+            elif "TxnCommitIn" in fields_json:
+                txn_volume = safe_float(fields_json["TxnCommitIn"])
+            elif "TxnRequestIn" in fields_json:
+                txn_volume = safe_float(fields_json["TxnRequestIn"])
 
             # -----------------------------
             # Queue metrics
@@ -175,6 +209,10 @@ class StorageService:
                 queue_bytes = safe_float(fields_json["BytesInput"])
             elif "QueueSize" in fields_json:
                 queue_bytes = safe_float(fields_json["QueueSize"])
+            elif "WorstStorageServerQueue" in fields_json:
+                queue_bytes = safe_float(fields_json["WorstStorageServerQueue"])
+            elif "WorstTLogQueue" in fields_json:
+                queue_bytes = safe_float(fields_json["WorstTLogQueue"])
 
             # -----------------------------
             # Durability lag
@@ -182,6 +220,10 @@ class StorageService:
             durability_lag_s = None
             if "DurableLag" in fields_json:
                 durability_lag_s = safe_float(fields_json["DurableLag"])
+            elif "DurabilityLag" in fields_json:
+                durability_lag_s = safe_float(fields_json["DurabilityLag"])
+            elif "WorstStorageServerDurabilityLag" in fields_json:
+                durability_lag_s = safe_float(fields_json["WorstStorageServerDurabilityLag"])
             elif "DurableVersion" in fields_json and "Version" in fields_json:
                 v = safe_float(fields_json["Version"])
                 dv = safe_float(fields_json["DurableVersion"])

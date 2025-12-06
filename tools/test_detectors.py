@@ -14,20 +14,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-# Import directly to avoid __init__.py dependencies
-import importlib.util
-investigation_tools_path = project_root / "tools" / "investigation_tools.py"
-spec = importlib.util.spec_from_file_location("investigation_tools", investigation_tools_path)
-investigation_tools = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(investigation_tools)
-
-detect_storage_engine_pressure = investigation_tools.detect_storage_engine_pressure
-detect_ratekeeper_throttling = investigation_tools.detect_ratekeeper_throttling
-detect_missing_tlogs = investigation_tools.detect_missing_tlogs
-detect_recovery_loop = investigation_tools.detect_recovery_loop
-detect_coordination_loss = investigation_tools.detect_coordination_loss
-detect_version_skew = investigation_tools.detect_version_skew
-detect_process_class_mismatch = investigation_tools.detect_process_class_mismatch
+from tools.investigation_tools import Detectors
 
 
 def main():
@@ -43,16 +30,17 @@ def main():
     
     print(f"\n🔍 Running detectors on: {db_path}\n")
     print("=" * 70)
+
+    det = Detectors(db_path)
     
     # Run all detectors
     detectors = [
-        ("Storage Engine Pressure", detect_storage_engine_pressure),
-        ("Ratekeeper Throttling", detect_ratekeeper_throttling),
-        ("Missing TLogs", detect_missing_tlogs),
-        ("Recovery Loop", detect_recovery_loop),
-        ("Coordination Loss", detect_coordination_loss),
-        ("Version Skew", detect_version_skew),
-        ("Process Class Mismatch", detect_process_class_mismatch),
+        ("Storage Engine Pressure", det.storage_engine_pressure),
+        ("Ratekeeper Throttling", det.ratekeeper_throttling),
+        ("Missing TLogs", det.missing_tlogs),
+        ("Recovery Loop", det.recovery_loop),
+        ("Coordination Loss", det.coordination_loss),
+        ("Z-Score Hotspots", det.zscore_hotspots),
     ]
     
     results = {}
@@ -94,4 +82,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
