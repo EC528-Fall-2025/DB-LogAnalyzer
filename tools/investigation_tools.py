@@ -17,8 +17,6 @@ from typing import List, Dict, Any, Optional
 from data_transfer_object.event_dto import EventModel
 from tools.database import get_conn
 
-
-
 # ============================================================
 # HELPER FUNCTIONS
 # ============================================================
@@ -204,7 +202,7 @@ class GlobalScanner:
         ]
 
     # -------------------------------------------------------
-    # 🔥 Rollback Detector (ClogWithRollbacks / Epoch Reset)
+    # Rollback Detector (ClogWithRollbacks / Epoch Reset)
     # -------------------------------------------------------
 
     def rollback_analysis(self):

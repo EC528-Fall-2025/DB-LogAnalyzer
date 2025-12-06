@@ -22,6 +22,9 @@ from tools.investigation_tools import (
     ContextAnalyzer,
     Detectors,
 )
+from tools.rag.query_formatter import build_rag_query
+from tools.rag.rag_client import RAGClient
+from tools.timeline_builder import TimelineBuilder
 
 FDB_KNOWLEDGE_BASE = """
 # FoundationDB Recovery Cluster Knowledge Base
@@ -243,7 +246,9 @@ class InvestigationAgent:
         db_path: str,
         max_iterations: int = 10,
         confidence_threshold: float = 0.8,
-        max_llm_calls: int = 4
+        max_llm_calls: int = 4,
+        use_rag: Optional[bool] = None,
+        rag_corpus: Optional[str] = None
     ):
         """
         Initialize investigation agent.
@@ -253,11 +258,20 @@ class InvestigationAgent:
             max_iterations: Maximum number of investigation iterations
             confidence_threshold: Confidence level required to stop investigation
             max_llm_calls: Max Gemini invocations allowed per investigation
+            use_rag: Enable RAG retrieval (defaults to True if RAG_CORPUS_RESOURCE env is set)
+            rag_corpus: Override RAG corpus resource path
         """
         self.db_path = db_path
         self.max_iterations = max_iterations
         self.confidence_threshold = confidence_threshold
         self.max_llm_calls = max(1, max_llm_calls)
+        self.use_rag = use_rag if use_rag is not None else bool(
+            os.getenv("RAG_CORPUS_RESOURCE") or os.getenv("RAG_CORPUS")
+        )
+        self.rag_corpus = rag_corpus
+        self.rag_client: Optional[RAGClient] = None
+        self.timeline_summary: Optional[Dict[str, Any]] = None
+        self.timeline_builder = TimelineBuilder(db_path)
 
         # Unified tools
         self.scanner = GlobalScanner(db_path)
@@ -333,13 +347,7 @@ When generating explanations, do not anchor on injected faults
 they occur BEFORE any signs of storage pressure or recovery churn.
 
 Injected I/O faults in clog/rollback workloads are mechanisms, not 
-primary causes. Explanations must reflect the correct causal order:
-
-- If version lag or storage queue size is extremely large 
-  (millions to 100M+), storage engine pressure is primary.
-- Recovery loops occurring BEFORE injected TLog faults indicate 
-  rollback cycles, not TLog-driven failures.
-- TLog failures during recovery are secondary symptoms.
+primary causes. Explanations must reflect the correct causal order.
 
 Explanations must describe the timeline and causal order rather 
 than over-interpreting isolated injected-fault events.
@@ -394,6 +402,87 @@ than over-interpreting isolated injected-fault events.
         truncated = text[:limit]
         note = f"\n\n[Context truncated to {limit} characters to satisfy token limits.]"
         return truncated + note
+
+    def _run_rag_retrieval(
+        self,
+        det_results: Dict[str, Any],
+        timeline: Dict[str, Any],
+        additional_data: List[tuple],
+        api_key: Optional[str],
+        tools_used: Optional[List[str]] = None
+    ) -> bool:
+        """Query the RAG corpus with detector/timeline summary."""
+        if not self.use_rag:
+            return False
+
+        if not self.rag_client:
+            try:
+                self.rag_client = RAGClient(
+                    api_key=api_key,
+                    corpus_resource=self.rag_corpus
+                )
+            except Exception as e:
+                print(f"   ⚠️  RAG disabled: {e}")
+                self._record_additional_data(additional_data, "rag_error", str(e))
+                self.use_rag = False
+                return False
+
+        query_text = build_rag_query(det_results or {}, timeline or {}, self.timeline_summary)
+        print("\n📚 Querying RAG corpus with detector summary...")
+
+        try:
+            rag_response = self.rag_client.retrieve(query_text)
+
+            rag_text_full = rag_response.get("text", "") if isinstance(rag_response, dict) else str(rag_response)
+            rag_text = rag_text_full
+            if len(rag_text) > 3000:
+                rag_text = rag_text[:3000] + "... [truncated]"
+
+            raw_chunks = []
+            if isinstance(rag_response, dict):
+                raw_chunks = rag_response.get("chunks", [])
+                if len(raw_chunks) > 3:
+                    raw_chunks = raw_chunks[:3] + ["... truncated chunks ..."]
+
+            # Console preview so operators can see the fetched text (full) and chunk markers
+            if rag_text_full:
+                preview_full = rag_text_full.replace("\n", " ")
+                print(f"   RAG text (full): {preview_full}")
+            if raw_chunks:
+                try:
+                    labels = []
+                    for ch in raw_chunks:
+                        if isinstance(ch, dict):
+                            # try to extract any obvious id/name markers
+                            name = ch.get("name") or ch.get("id") or ch.get("displayName")
+                            if not name:
+                                if "candidates" in ch and ch["candidates"]:
+                                    cand = ch["candidates"][0]
+                                    name = cand.get("name") or cand.get("id")
+                            labels.append(name or "chunk")
+                        else:
+                            labels.append(str(ch)[:80])
+                    print(f"   RAG chunks: {labels}")
+                except Exception:
+                    print(f"   RAG chunks: {len(raw_chunks)} (unparsed)")
+
+            self._record_additional_data(
+                additional_data,
+                "rag_retrieval",
+                {
+                    "query": query_text,
+                    "response_text": rag_text,
+                    "raw_chunks": raw_chunks,
+                }
+            )
+            if tools_used is not None:
+                tools_used.append("RAG.retrieve")
+            print("   ✓ RAG response captured")
+            return True
+        except Exception as e:
+            print(f"   ⚠️  RAG retrieval failed: {e}")
+            self._record_additional_data(additional_data, "rag_error", str(e))
+            return False
 
     # ======================================================
     # METRIC EXTRACTION & EVENT FORMATTING
@@ -614,9 +703,9 @@ Event {i}{severity_indicator}:
 
         return "\n".join(lines)
 
-    # ======================================================
-    # LLM CALL
-    # ======================================================
+        # ======================================================
+        # LLM CALL
+        # ======================================================
 
     def _analyze_with_llm(
         self,
@@ -822,7 +911,9 @@ The JSON format MUST remain exactly:
         tools_used: List[str] = []
         all_events: List[EventModel] = []
         all_additional_data: List[tuple] = []
+        timeline_highlights: Dict[str, Any] = {}
         inspected_buckets: List[int] = []
+        bucket_data: List[Dict[str, Any]] = []
         global_summary_done = False
         coverage_complete = False
         phase = "A"
@@ -834,21 +925,26 @@ The JSON format MUST remain exactly:
         print(f"\n🔍 Investigating: {initial_question}")
         print(f"   Target confidence: {self.confidence_threshold:.2f}")
         print(f"   Max iterations: {self.max_iterations}\n")
+        if self.use_rag:
+            corpus_msg = self.rag_corpus or os.getenv("RAG_CORPUS_RESOURCE") or os.getenv("RAG_CORPUS") or "default corpus"
+            print(f"   RAG: enabled (corpus={corpus_msg})")
+        else:
+            print("   RAG: disabled (set use_rag=True or RAG_CORPUS_RESOURCE env to enable)")
 
         while iteration < self.max_iterations:
             iteration += 1
             print(f"\n{'='*70}")
-            print(f"📊 Iteration {iteration}/{self.max_iterations} - Phase {phase}")
+            print(f"Iteration {iteration}/{self.max_iterations} - Phase {phase}")
             print(f"{'='*70}")
 
             # -------------------------
             # Phase A: Global Sweep
             # -------------------------
             if phase == "A":
-                print("\n🌐 Phase A: Global Sweep (GlobalScanner)\n")
+                print("\nPhase A: Global Sweep (GlobalScanner)\n")
 
                 # 1) Top severe events (>=30)
-                print("1️⃣  Top events (severity >= 30)...")
+                print("\n1)  Top events (severity >= 30)...")
                 top_events = self.scanner.top_events(severity_min=30, limit=500)
                 tools_used.append("GlobalScanner.top_events")
                 if self._append_events(all_events, top_events):
@@ -856,7 +952,7 @@ The JSON format MUST remain exactly:
                 print(f"   Found {len(top_events)} top events")
 
                 # 2) Severity counts
-                print("\n2️⃣  Severity counts...")
+                print("\n2)  Severity counts...")
                 sev_counts = self.scanner.severity_counts()
                 tools_used.append("GlobalScanner.severity_counts")
                 self._record_additional_data(all_additional_data, "severity_counts", sev_counts)
@@ -906,6 +1002,21 @@ The JSON format MUST remain exactly:
                     f"resets={rollback_info.get('num_resets')}, "
                     f"rv_resets={rollback_info.get('num_recovery_resets')}")
 
+                bucket_data = buckets
+                timeline_highlights = {
+                    "time_span": span,
+                    "top_event_types": list(summary.get("event_histogram", {}).items())[:5] if summary else [],
+                    "hot_buckets": [
+                        {
+                            "bucket_start": b.get("bucket_start").isoformat() if b.get("bucket_start") else b.get("bucket_start_epoch"),
+                            "max_severity": b.get("max_severity"),
+                            "count": b.get("count"),
+                        }
+                        for b in buckets[:5]
+                    ] if buckets else [],
+                    "rollback_detected": rollback_info.get("detected") if rollback_info else None,
+                }
+
                 phase = "B"
                 print("\n✅ Phase A complete. Moving to Phase B.")
                 context_dirty = True
@@ -937,6 +1048,9 @@ The JSON format MUST remain exactly:
                         ]
                     )
                     events_text += additional_text
+
+                if self.timeline_summary:
+                    events_text += "\n\nTimeline Builder:\n" + json.dumps(self.timeline_summary, indent=2, default=str)
 
                 events_text = self._enforce_context_limit(events_text)
 
@@ -1008,6 +1122,19 @@ The JSON format MUST remain exactly:
 
             self._record_additional_data(all_additional_data, "detectors", det_results)
             context_dirty = True
+
+            rag_added = self._run_rag_retrieval(det_results, timeline_highlights, all_additional_data, api_key, tools_used)
+            if rag_added:
+                context_dirty = True
+
+            # Build timeline after detectors + buckets
+            try:
+                self.timeline_summary = self.timeline_builder.build(all_events, det_results, bucket_data)
+                if self.timeline_summary:
+                    self._record_additional_data(all_additional_data, "timeline_builder", self.timeline_summary)
+                    context_dirty = True
+            except Exception as e:
+                print(f"   ⚠️  timeline_builder error: {e}")
 
             # -------------------------
             # Phase B/C: Hotspot coverage with HotspotSelector + ContextAnalyzer
