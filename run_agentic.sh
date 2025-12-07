@@ -1,14 +1,6 @@
 #!/bin/bash
 
 # === Agentic RCA Pipeline Runner ===
-# Usage:
-#   ./run_agentic.sh "What issue is being tested?"
-#
-# Requirements:
-#   - .env file present (copy from .env.example)
-#   - logs in ./simlogs
-#   - secrets/sa.json present
-#   - Docker Desktop running
 
 QUERY="$1"
 
@@ -19,26 +11,35 @@ if [ -z "$QUERY" ]; then
     exit 1
 fi
 
-# === Step 1: Load logs into DuckDB ===
+# Resolve directory of this script
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Correct paths
+SIMLOGS_DIR="$SCRIPT_DIR/data/log_example/simlogs"
+DB_DIR="$SCRIPT_DIR/data"
+SECRETS_DIR="$SCRIPT_DIR/secrets/sa.json"
+
 echo "=== Loading logs into DuckDB ==="
+
 docker run --rm -it \
-  --env-file .env \
-  -v "$(pwd)/simlogs:/logs" \
-  -v "$(pwd)/data:/data" \
-  -v "$(pwd)/secrets/sa.json:/secrets/sa.json:ro" \
+  --env-file "$SCRIPT_DIR/.env" \
+  -v "$SIMLOGS_DIR:/logs" \
+  -v "$DB_DIR:/data" \
+  -v "$SECRETS_DIR:/secrets/sa.json:ro" \
   -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa.json \
   vanshikachaddha/fdb-log-analyzer \
   load /logs --all --db /data/fdb_logs.duckdb
 
-# === Step 2: Run RAG-powered agentic RCA ===
 echo "=== Running RAG-powered RCA ==="
+
 docker run --rm -it \
-  --env-file .env \
-  -v "$(pwd)/data:/data" \
-  -v "$(pwd)/secrets/sa.json:/secrets/sa.json:ro" \
+  --env-file "$SCRIPT_DIR/.env" \
+  -v "$DB_DIR:/data" \
+  -v "$SECRETS_DIR:/secrets/sa.json:ro" \
   -e GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa.json \
+  --entrypoint "" \
   vanshikachaddha/fdb-log-analyzer \
-  tools/agentic_loop/query_test.py \
+  python tools/agentic_loop/query_test.py \
       /data/fdb_logs.duckdb \
       "$QUERY" \
       --confidence 0.9 \
