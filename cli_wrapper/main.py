@@ -187,41 +187,41 @@ class CLI:
         rollup_parser.set_defaults(func=self.handle_rollup)
         
         # agentic command - Run agentic loop (detect → recommend fix)
-        agentic_parser = subparsers.add_parser('agentic', help='Run agentic loop: detect anomalies → AI diagnosis → recommend fixes (Pure AI)')
-        agentic_parser.add_argument(
-            'log_file',
-            help='Log file path to analyze'
-        )
-        agentic_parser.add_argument(
-            '--limit',
-            type=int,
-            help='Maximum number of events to process (default: all)'
-        )
-        agentic_parser.add_argument(
-            '--no-codecoverage',
-            action='store_true',
-            help='Exclude CodeCoverage events (challenge mode: let AI figure out recovery causes)'
-        )
-        agentic_parser.add_argument(
-            '--z-score',
-            type=float,
-            default=2.0,
-            help='Z-score threshold for anomaly detection (default: 2.0)'
-        )
-        agentic_parser.add_argument(
-            '--output',
-            help='Output file for results (JSON format, optional)'
-        )
-        agentic_parser.add_argument(
-            '--no-ai',
-            action='store_true',
-            help='Disable AI analysis (use only rule-based detection)'
-        )
-        agentic_parser.add_argument(
-            '--api-key',
-            help='Google Gemini API key (or set GEMINI_API_KEY env var)'
-        )
-        agentic_parser.set_defaults(func=self.handle_agentic)
+        # agentic_parser = subparsers.add_parser('agentic', help='Run agentic loop: detect anomalies → AI diagnosis → recommend fixes (Pure AI)')
+        # agentic_parser.add_argument(
+        #     'log_file',
+        #     help='Log file path to analyze'
+        # )
+        # agentic_parser.add_argument(
+        #     '--limit',
+        #     type=int,
+        #     help='Maximum number of events to process (default: all)'
+        # )
+        # agentic_parser.add_argument(
+        #     '--no-codecoverage',
+        #     action='store_true',
+        #     help='Exclude CodeCoverage events (challenge mode: let AI figure out recovery causes)'
+        # )
+        # agentic_parser.add_argument(
+        #     '--z-score',
+        #     type=float,
+        #     default=2.0,
+        #     help='Z-score threshold for anomaly detection (default: 2.0)'
+        # )
+        # agentic_parser.add_argument(
+        #     '--output',
+        #     help='Output file for results (JSON format, optional)'
+        # )
+        # agentic_parser.add_argument(
+        #     '--no-ai',
+        #     action='store_true',
+        #     help='Disable AI analysis (use only rule-based detection)'
+        # )
+        # agentic_parser.add_argument(
+        #     '--api-key',
+        #     help='Google Gemini API key (or set GEMINI_API_KEY env var)'
+        # )
+        # agentic_parser.set_defaults(func=self.handle_agentic)
         
         return parser
     
@@ -660,54 +660,52 @@ class CLI:
         finally:
             service.close()
 
-    def handle_agentic(self, args):
-        """Handle agentic command - Run end-to-end anomaly detection and recommendation."""
-        import json
-
-        from tools.agentic_loop.agentic_loop import AgenticLoop
+    # def handle_agentic(self, args):
+    #     """Handle agentic command - Run end-to-end anomaly detection and recommendation."""
+    #     import json
         
-        # Check if log file exists
-        if not os.path.exists(args.log_file):
-            print(f"Error: Log file does not exist: {args.log_file}", file=sys.stderr)
-            sys.exit(1)
+    #     # Check if log file exists
+    #     if not os.path.exists(args.log_file):
+    #         print(f"Error: Log file does not exist: {args.log_file}", file=sys.stderr)
+    #         sys.exit(1)
         
-        try:
-            # Initialize agentic loop
-            loop = AgenticLoop(
-                z_score_threshold=args.z_score,
-                recovery_lookback=5.0,
-                auto_filter=True,
-                use_ai=not args.no_ai,
-                api_key=args.api_key
-            )
+    #     try:
+    #         # Initialize agentic loop
+    #         loop = AgenticLoop(
+    #             z_score_threshold=args.z_score,
+    #             recovery_lookback=5.0,
+    #             auto_filter=True,
+    #             use_ai=not args.no_ai,
+    #             api_key=args.api_key
+    #         )
             
-            # Run the loop
-            result = loop.run(
-                log_path=args.log_file,
-                limit=args.limit,
-                include_codecoverage=not args.no_codecoverage
-            )
+    #         # Run the loop
+    #         result = loop.run(
+    #             log_path=args.log_file,
+    #             limit=args.limit,
+    #             include_codecoverage=not args.no_codecoverage
+    #         )
             
-            # Print results
-            loop.print_results(result)
+    #         # Print results
+    #         loop.print_results(result)
             
-            # Save to file if requested
-            if args.output:
-                with open(args.output, 'w') as f:
-                    json.dump(result.to_dict(), f, indent=2, ensure_ascii=False)
-                print(f"📄 Results saved to: {args.output}")
+    #         # Save to file if requested
+    #         if args.output:
+    #             with open(args.output, 'w') as f:
+    #                 json.dump(result.to_dict(), f, indent=2, ensure_ascii=False)
+    #             print(f"📄 Results saved to: {args.output}")
             
-        except Exception as e:
-            print(f"Agentic loop failed: {e}", file=sys.stderr)
-            import traceback
-            traceback.print_exc()
-            sys.exit(1)
+    #     except Exception as e:
+    #         print(f"Agentic loop failed: {e}", file=sys.stderr)
+    #         import traceback
+    #         traceback.print_exc()
+    #         sys.exit(1)
     
-    @staticmethod
-    def _is_supported_log_file(file_path: Path) -> bool:
-        """Check if log file is a supported type"""
-        supported_suffixes = {'.json', '.xml', '.log', '.txt'}
-        return file_path.suffix.lower() in supported_suffixes
+    # @staticmethod
+    # def _is_supported_log_file(file_path: Path) -> bool:
+    #     """Check if log file is a supported type"""
+    #     supported_suffixes = {'.json', '.xml', '.log', '.txt'}
+    #     return file_path.suffix.lower() in supported_suffixes
 
 
 def cli():

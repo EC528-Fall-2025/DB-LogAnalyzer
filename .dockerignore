@@ -1,0 +1,10 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+*.DS_Store
+venv
+*.duckdb
+data/*.duckdb
+data/llm_*.txt
+rag-corpus

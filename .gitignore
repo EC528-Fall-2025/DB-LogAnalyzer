@@ -145,3 +145,6 @@ wandb/
 logs
 
 fdb_logs.duckdb
+
+.env
+secrets/

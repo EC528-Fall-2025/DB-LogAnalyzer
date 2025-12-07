@@ -107,7 +107,6 @@ def main():
         print(f"Confidence: {result.confidence:.2f}")
         print(f"Reasoning: {result.reasoning}")
         print(f"Tools Used: {', '.join(result.tools_used)}")
-        print(f"Evidence Events: {len(result.evidence_events)} events")
         print("\n")
         
     except Exception as e:
