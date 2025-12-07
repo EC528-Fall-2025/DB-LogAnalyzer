@@ -330,8 +330,11 @@ These scenarios illustrate the core value of the system: helping users move from
 
 # 4. Solution Concept
 
-## Current Architecture
+## OLD Architecture
 <img width="1422" height="673" alt="Screenshot 2025-09-23 at 9 37 39 PM" src="https://github.com/user-attachments/assets/b980b93e-79e0-48dd-b1d2-9980b52e8a36" />
+
+## CURRENT Architecture
+
 
 ## Global Architectural Structure Of the Project
 
