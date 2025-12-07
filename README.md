@@ -334,6 +334,7 @@ These scenarios illustrate the core value of the system: helping users move from
 <img width="1422" height="673" alt="Screenshot 2025-09-23 at 9 37 39 PM" src="https://github.com/user-attachments/assets/b980b93e-79e0-48dd-b1d2-9980b52e8a36" />
 
 ## CURRENT Architecture
+<img width="1273" height="664" alt="Screenshot 2025-12-07 at 4 33 39 AM" src="https://github.com/user-attachments/assets/acef96e8-c426-4162-8537-a3f48d819793" />
 
 
 ## Global Architectural Structure Of the Project
