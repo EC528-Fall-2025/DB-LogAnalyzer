@@ -29,7 +29,7 @@
 **Status:** In progress 🛠️
 
 - _FDB-LogAnalyzer: Agentic FoundationDB Log Analysis with Timeline + RAG_  
-  Draft: [https://docs.google.com/document/d/1xx0jur50JvdzV1Zm70kIeVCEnbQF9N3S/edit](#)
+  Draft: [Link](https://docs.google.com/document/d/1xx0jur50JvdzV1Zm70kIeVCEnbQF9N3S/edit)(#)
 
 ## 1.   Vision and Goals Of The Project:
 
