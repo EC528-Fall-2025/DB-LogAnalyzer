@@ -425,7 +425,7 @@ than over-interpreting isolated injected-fault events.
             if text:
                 return text
         except Exception as e:
-            print(f"   ⚠️  RAG summarizer failed, using raw query. Error: {e}")
+            print(f"   RAG summarizer failed, using raw query. Error: {e}")
         return None
 
     def _run_rag_retrieval(
@@ -447,7 +447,7 @@ than over-interpreting isolated injected-fault events.
                     corpus_resource=self.rag_corpus
                 )
             except Exception as e:
-                print(f"   ⚠️  RAG disabled: {e}")
+                print(f"   RAG disabled: {e}")
                 self._record_additional_data(additional_data, "rag_error", str(e))
                 self.use_rag = False
                 return False
@@ -456,11 +456,11 @@ than over-interpreting isolated injected-fault events.
         summarized_query = self._summarize_for_rag(query_text_raw, api_key)
         if not summarized_query:
             msg = "RAG summarizer unavailable; skipping RAG retrieval to avoid sending raw detector/timeline text."
-            print(f"   ⚠️  {msg}")
+            print(f"   {msg}")
             self._record_additional_data(additional_data, "rag_error", msg)
             return False
         query_text = summarized_query
-        print("\n📚 Querying RAG corpus with detector summary...")
+        print("\nQuerying RAG corpus with detector summary...")
         print("   Using LLM-summarized RAG query.")
         try:
             print(f"   RAG query (summarized): {query_text}")
@@ -517,7 +517,7 @@ than over-interpreting isolated injected-fault events.
             print("   ✓ RAG response captured")
             return True
         except Exception as e:
-            print(f"   ⚠️  RAG retrieval failed: {e}")
+            print(f"   RAG retrieval failed: {e}")
             self._record_additional_data(additional_data, "rag_error", str(e))
             return False
 
@@ -635,7 +635,7 @@ than over-interpreting isolated injected-fault events.
         lines.append("🔴 CRITICAL: PRIORITIZE METRICS OVER EVENT SEVERITY")
         lines.append("=" * 70)
         lines.append("")
-        lines.append("⚠️  METRICS ARE MORE IMPORTANT THAN EVENT SEVERITY!")
+        lines.append("METRICS ARE MORE IMPORTANT THAN EVENT SEVERITY!")
         lines.append("   - VersionLag spikes (>100k, especially >1M) indicate storage pressure")
         lines.append("   - Negative latencies indicate timing bugs/overflows")
         lines.append("   - Throttling reasons show performance degradation")
@@ -650,7 +650,7 @@ than over-interpreting isolated injected-fault events.
             lines.append(f"   Found {len(metrics['version_lag_spikes'])} events with VersionLag > 100k")
             critical_lags = [m for m in metrics["version_lag_spikes"] if m["version_lag"] > 1_000_000]
             if critical_lags:
-                lines.append(f"   ⚠️  {len(critical_lags)} events with VersionLag > 1M (CRITICAL)")
+                lines.append(f"   {len(critical_lags)} events with VersionLag > 1M (CRITICAL)")
                 for lag in critical_lags[:5]:
                     lines.append(
                         f"      - {lag['timestamp']}: VersionLag={lag['version_lag']:.0f} "
@@ -712,9 +712,9 @@ than over-interpreting isolated injected-fault events.
 
             severity_indicator = ""
             if (event.severity or 0) >= 40:
-                severity_indicator = " ⚠️ CRITICAL ERROR"
+                severity_indicator = " CRITICAL ERROR"
             elif (event.severity or 0) == 20:
-                severity_indicator = " ⚠️ WARNING"
+                severity_indicator = " WARNING"
 
             fields_str = "N/A"
             if event.fields_json:
@@ -844,7 +844,7 @@ The JSON format MUST remain exactly:
 
                     if is_quota_error and attempt < max_retries - 1:
                         wait_time = retry_delay * (2 ** attempt)
-                        print(f"\n⚠️  API Quota Exceeded. Waiting {wait_time}s before retry {attempt + 2}/{max_retries}...")
+                        print(f"\nAPI Quota Exceeded. Waiting {wait_time}s before retry {attempt + 2}/{max_retries}...")
                         time.sleep(wait_time)
                         continue
                     elif is_quota_error:
@@ -886,7 +886,7 @@ The JSON format MUST remain exactly:
             if event_name_focus and not has_metric_focus and has_metric_anomalies:
                 confidence_out = min(confidence_out, 0.4)
                 reasoning_out = (
-                    "[⚠️ Confidence reduced: Metrics detected but hypothesis focuses on event names. "
+                    "[Confidence reduced: Metrics detected but hypothesis focuses on event names. "
                     "Metrics are more important than event severity.] " + reasoning_out
                 )
             elif event_name_focus and not has_metric_focus:
@@ -962,7 +962,7 @@ The JSON format MUST remain exactly:
         llm_calls = 0
         hotspot_inspected = False
 
-        print(f"\n🔍 Investigating: {initial_question}")
+        print(f"\nInvestigating: {initial_question}")
         print(f"   Target confidence: {self.confidence_threshold:.2f}")
         print(f"   Max iterations: {self.max_iterations}\n")
         if self.use_rag:
@@ -1052,7 +1052,7 @@ The JSON format MUST remain exactly:
                     self._record_additional_data(all_additional_data, "metric_baselines_upsert", baseline_info)
                     print(f"   Baselines upserted: {baseline_info.get('upserted')}")
                 except Exception as e:
-                    print(f"   ⚠️  metric_baselines error: {e}")
+                    print(f"   metric_baselines error: {e}")
                 
                 #9) Recovery Episodes
                 print("\n9)  Recovery episodes (grouped recoveries)...")
@@ -1062,7 +1062,7 @@ The JSON format MUST remain exactly:
                     self._record_additional_data(all_additional_data, "recovery_episodes", recovery_eps)
                     print(f"   Recovery episodes: {recovery_eps.get('count')}")
                 except Exception as e:
-                    print(f"   ⚠️  recovery_episodes error: {e}")
+                    print(f"   recovery_episodes error: {e}")
                     recovery_eps = None
 
                 bucket_data = buckets
@@ -1097,56 +1097,56 @@ The JSON format MUST remain exactly:
             # -------------------------
             # Global detectors first
             # -------------------------
-            print("\n🧪 Running core detectors (global only before hotspot dive)...")
+            print("\nRunning core detectors (global only before hotspot dive)...")
             det_results = {}
             try:
                 det_results["storage_engine_pressure"] = self.detectors.storage_engine_pressure()
                 tools_used.append("Detectors.storage_engine_pressure(global)")
                 print("   ➜ Detectors.storage_engine_pressure(global)")
             except Exception as e:
-                print(f"   ⚠️  storage_engine_pressure(global) error: {e}")
+                    print(f"   storage_engine_pressure(global) error: {e}")
             try:
                 det_results["recovery_loop"] = self.detectors.recovery_loop()
                 tools_used.append("Detectors.recovery_loop(global)")
                 print("   ➜ Detectors.recovery_loop(global)")
             except Exception as e:
-                print(f"   ⚠️  recovery_loop(global) error: {e}")
+                    print(f"   recovery_loop(global) error: {e}")
             try:
                 det_results["ratekeeper_throttling"] = self.detectors.ratekeeper_throttling()
                 tools_used.append("Detectors.ratekeeper_throttling(global)")
                 print("   ➜ Detectors.ratekeeper_throttling(global)")
             except Exception as e:
-                print(f"   ⚠️  ratekeeper_throttling(global) error: {e}")
+                    print(f"   ratekeeper_throttling(global) error: {e}")
             try:
                 det_results["missing_tlogs"] = self.detectors.missing_tlogs()
                 tools_used.append("Detectors.missing_tlogs(global)")
                 print("   ➜ Detectors.missing_tlogs(global)")
             except Exception as e:
-                print(f"   ⚠️  missing_tlogs(global) error: {e}")
+                    print(f"   missing_tlogs(global) error: {e}")
             try:
                 det_results["coordination_loss"] = self.detectors.coordination_loss()
                 tools_used.append("Detectors.coordination_loss(global)")
                 print("   ➜ Detectors.coordination_loss(global)")
             except Exception as e:
-                print(f"   ⚠️  coordination_loss(global) error: {e}")
+                    print(f"   coordination_loss(global) error: {e}")
             try:
                 det_results["zscore_hotspots"] = self.detectors.zscore_hotspots()
                 tools_used.append("Detectors.zscore_hotspots(global)")
                 print("   ➜ Detectors.zscore_hotspots(global)")
             except Exception as e:
-                print(f"   ⚠️  zscore_hotspots(global) error: {e}")
+                    print(f"   zscore_hotspots(global) error: {e}")
             try:
                 det_results["baseline_window_anomalies"] = self.detectors.baseline_window_anomalies()
                 tools_used.append("Detectors.baseline_window_anomalies(global)")
                 print("   ➜ Detectors.baseline_window_anomalies(global)")
             except Exception as e:
-                print(f"   ⚠️  baseline_window_anomalies(global) error: {e}")
+                    print(f"   baseline_window_anomalies(global) error: {e}")
             try:
                 det_results["metric_anomalies"] = self.detectors.metric_anomalies()
                 tools_used.append("Detectors.metric_anomalies(global)")
                 print("   ➜ Detectors.metric_anomalies(global)")
             except Exception as e:
-                print(f"   ⚠️  metric_anomalies(global) error: {e}")
+                    print(f"   metric_anomalies(global) error: {e}")
 
             self._record_additional_data(all_additional_data, "detectors", det_results)
             self._last_det_results = det_results
@@ -1163,7 +1163,7 @@ The JSON format MUST remain exactly:
                     self._record_additional_data(all_additional_data, "timeline_builder", self.timeline_summary)
                     context_dirty = True
             except Exception as e:
-                print(f"   ⚠️  timeline_builder error: {e}")
+                print(f"   timeline_builder error: {e}")
 
             rag_added = self._run_rag_retrieval(det_results, timeline_highlights, all_additional_data, api_key, tools_used)
             if rag_added:
@@ -1181,9 +1181,9 @@ The JSON format MUST remain exactly:
             }
 
             if llm_calls >= self.max_llm_calls:
-                print(f"\n🤖 Skipping LLM: call budget {self.max_llm_calls} exhausted.")
+                print(f"\nSkipping LLM: call budget {self.max_llm_calls} exhausted.")
             elif not context_dirty:
-                print("\n🤖 Skipping LLM: no new context since last analysis.")
+                print("\nSkipping LLM: no new context since last analysis.")
             else:
                 events_text = self._format_events_for_llm(all_events[:100])
 
@@ -1206,9 +1206,9 @@ The JSON format MUST remain exactly:
                     if path:
                         print(f"   LLM input written to: {path}")
                 except Exception as e:
-                    print(f"   ⚠️  llm_input_logger error: {e}")
+                    print(f"   llm_input_logger error: {e}")
 
-                print(f"\n🤖 Analyzing with LLM (call {llm_calls + 1}/{self.max_llm_calls})...")
+                print(f"\nAnalyzing with LLM (call {llm_calls + 1}/{self.max_llm_calls})...")
                 print(f"   Current confidence: {confidence:.2f}")
                 if hypothesis:
                     print(f"   Current hypothesis: {hypothesis[:100]}...")
@@ -1228,7 +1228,7 @@ The JSON format MUST remain exactly:
                     if out_path:
                         print(f"   LLM output written to: {out_path}")
                 except Exception as e:
-                    print(f"   ⚠️  llm_output_logger error: {e}")
+                    print(f"   llm_output_logger error: {e}")
                 llm_calls += 1
                 context_dirty = False
 
@@ -1236,7 +1236,7 @@ The JSON format MUST remain exactly:
             confidence = analysis["confidence"]
             reasoning = analysis.get("reasoning", "")
 
-            print(f"\n📊 Iteration {iteration} Results:")
+            print(f"\nIteration {iteration} Results:")
             print(f"   Confidence: {confidence:.2f} (target: {self.confidence_threshold:.2f})")
             print(f"   Hypothesis: {hypothesis[:150]}...")
 
@@ -1254,7 +1254,7 @@ The JSON format MUST remain exactly:
                 pass
 
             if not chosen_bucket:
-                print("\n🔍 Checking for uncovered high-severity buckets (HotspotSelector)...")
+                print("\nChecking for uncovered high-severity buckets (HotspotSelector)...")
                 uncovered = []
                 try:
                     uncovered = self.hotspots.get_uncovered(
@@ -1264,7 +1264,7 @@ The JSON format MUST remain exactly:
                     )
                     tools_used.append("HotspotSelector.get_uncovered")
                 except Exception as e:
-                    print(f"   ⚠️  get_uncovered error: {e}")
+                    print(f"   get_uncovered error: {e}")
                 if uncovered:
                     chosen_bucket = uncovered[0]
 
@@ -1284,7 +1284,7 @@ The JSON format MUST remain exactly:
                     ).fetchone()[0]
                     print(f"   Window row count (ts between {window_start} and {window_end}): {dbg_count}")
                 except Exception as e:
-                    print(f"   ⚠️  window count debug failed: {e}")
+                    print(f"   window count debug failed: {e}")
 
                 try:
                     bucket_events = self.ctx.context_window(
@@ -1299,19 +1299,19 @@ The JSON format MUST remain exactly:
                     print(f"   Added {len(bucket_events)} events from hotspot bucket")
                     hotspot_inspected = True
                 except Exception as e:
-                    print(f"   ⚠️  context_window error: {e}")
+                    print(f"   context_window error: {e}")
             else:
-                print("\n   ✅ No remaining hotspots/buckets to inspect.")
+                print("\n   No remaining hotspots/buckets to inspect.")
                 coverage_complete = True
 
             # If confidence already high, stop early (but ensure at least one hotspot inspected if available)
             if confidence >= self.confidence_threshold and (hotspot_inspected or coverage_complete):
-                print("\n✅ Confidence threshold reached; stopping iterations.")
+                print("\nConfidence threshold reached; stopping iterations.")
                 break
 
             # If we've hit max iterations, stop
             if iteration >= self.max_iterations:
-                print(f"\n⚠️  Reached max iterations ({self.max_iterations})")
+                print(f"\nReached max iterations ({self.max_iterations})")
                 break
 
         # ============================

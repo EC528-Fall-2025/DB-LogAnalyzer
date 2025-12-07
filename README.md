@@ -19,6 +19,18 @@
 - **Sprint 3 Demo Slides:** [Link](https://docs.google.com/presentation/d/1cjRuqCkxPs6AHikMo5JrXXBsWedwZa64/edit?usp=sharing&ouid=113513264960850511829&rtpof=true&sd=true)
 - **Sprint 4 Demo Video:** [Link](https://drive.google.com/file/d/1wKtvsR3i8nEnGut6-YjPbHMEYCRf6iN4/view?usp=sharing)  
 - **Sprint 4 Demo Slides:** [Link](https://docs.google.com/presentation/d/1I2S8yGN1IRloVvZTsVIafV4YTwY8hIcz/edit?usp=sharing&ouid=113513264960850511829&rtpof=true&sd=true)
+- **Sprint 5 Demo Video:** [Link](https://drive.google.com/file/d/19Kr-ciG37Z2RYUtSk78TWc8ZQ5ofjWtg/view?usp=sharing)  
+- **Sprint 5 Demo Slides:** [Link](https://docs.google.com/presentation/d/1BBK2vaw_zYxLhVQ5w8xMsOllPMB-lKNy2bJqaRM2Vh4/edit?usp=sharing)
+
+- **Sprint 6 Demo Video:** [Link]()  
+- **Sprint 6 Demo Slides:** [Link](https://docs.google.com/presentation/d/1kQMmr0Hp2SKAnSIPVoThiDE941WNlLWNY_2IJh3QJoc/edit?usp=sharing)
+
+## Paper
+
+**Status:** In progress 🛠️
+
+- _FDB-LogAnalyzer: Agentic FoundationDB Log Analysis with Timeline + RAG_  
+  Draft: [Link](https://docs.google.com/document/d/1xx0jur50JvdzV1Zm70kIeVCEnbQF9N3S/edit)
 
 ## 1.   Vision and Goals Of The Project:
 
