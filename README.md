@@ -24,6 +24,12 @@
 - **Sprint 6 Demo Video:** [Link]()  
 - **Sprint 6 Demo Slides:** [Link](https://docs.google.com/presentation/d/1kQMmr0Hp2SKAnSIPVoThiDE941WNlLWNY_2IJh3QJoc/edit?usp=sharing)
 
+## Paper
+
+**Status:** In progress 🛠️
+
+- _FDB-LogAnalyzer: Agentic FoundationDB Log Analysis with Timeline + RAG_  
+  Draft: [https://docs.google.com/document/d/1xx0jur50JvdzV1Zm70kIeVCEnbQF9N3S/edit](#)
 
 ## 1.   Vision and Goals Of The Project:
 
