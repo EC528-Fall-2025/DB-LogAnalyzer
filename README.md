@@ -1,7 +1,27 @@
 # Database Log Analysis using LLMs
 
-## Collaborators
+## Table of Contents
+- [Collaborators](#collaborators)
+- [Sprint Demo Videos and Slides](#sprint-demo-videos-and-slides)
+- [Paper](#paper)
+- [FDB Log Analyzer Setup Guide](#fdb-log-analyzer-setup-guide)
+  - [1. Prerequisites](#1-prerequisites)
+  - [2. Service Account Setup](#2-service-account-setup)
+  - [3. Environment Variables](#3-environment-variables)
+  - [4. Pull the Docker Image](#4-pull-the-docker-image)
+  - [5. Provide Input Logs](#5-provide-input-logs)
+  - [6. Running the Agentic RCA Pipeline](#6-running-the-agentic-rca-pipeline)
+  - [Notes](#notes)
+- [1. Vision and Goals Of The Project](#1-vision-and-goals-of-the-project)
+- [2. Users / Personas of the Project](#2-users--personas-of-the-project)
+- [3. Scope and Features Of The Project](#3-scope-and-features-of-the-project)
+- [4. Solution Concept](#4-solution-concept)
+- [5. Acceptance Criteria](#5-acceptance-criteria)
+- [6. Release Planning](#6-release-planning)
+
 ---
+
+## Collaborators
 | Name | Email |
 |---|---|
 | Miray Ayerdem | mirayrdm@bu.edu |
@@ -21,7 +41,6 @@
 - **Sprint 4 Demo Slides:** [Link](https://docs.google.com/presentation/d/1I2S8yGN1IRloVvZTsVIafV4YTwY8hIcz/edit?usp=sharing&ouid=113513264960850511829&rtpof=true&sd=true)
 - **Sprint 5 Demo Video:** [Link](https://drive.google.com/file/d/19Kr-ciG37Z2RYUtSk78TWc8ZQ5ofjWtg/view?usp=sharing)  
 - **Sprint 5 Demo Slides:** [Link](https://docs.google.com/presentation/d/1BBK2vaw_zYxLhVQ5w8xMsOllPMB-lKNy2bJqaRM2Vh4/edit?usp=sharing)
-
 - **Sprint 6 Demo Video:** [Link]()  
 - **Sprint 6 Demo Slides:** [Link](https://docs.google.com/presentation/d/1kQMmr0Hp2SKAnSIPVoThiDE941WNlLWNY_2IJh3QJoc/edit?usp=sharing)
 
@@ -31,32 +50,35 @@
 
 - _FDB-LogAnalyzer: Agentic FoundationDB Log Analysis with Timeline + RAG_  
   Draft: [Link](https://docs.google.com/document/d/1xx0jur50JvdzV1Zm70kIeVCEnbQF9N3S/edit)
-## FDB Log Analyzer Setup Guide
 
-### 🚀 1. Prerequisites
+---
 
-#### Install Docker Desktop
+# FDB Log Analyzer Setup Guide
+
+## 1. Prerequisites
+
+### Install Docker Desktop
 Download and install from: https://www.docker.com/products/docker-desktop/
 
-#### Google Cloud Project Required
+### Google Cloud Project Required
 Used for:
 * Vertex AI
 * Gemini Models
 * RAG Corpus Retrieval
 
-#### Enable Required APIs
+### Enable Required APIs
 In Google Cloud Console → APIs & Services → Enable:
 * Vertex AI API
 * Vertex AI Generative Models API
 
 ---
 
-### 🔐 2. Service Account Setup
+## 2. Service Account Setup
 
-#### 1. Navigate to Service Accounts
+### Step 1: Navigate to Service Accounts
 In Google Cloud Console → IAM & Admin → Service Accounts
 
-#### 2. Create New Service Account
+### Step 2: Create New Service Account
 Click **+ CREATE SERVICE ACCOUNT**
 
 Fill in:
@@ -66,7 +88,7 @@ Fill in:
 
 Click **Create and Continue**.
 
-#### 3. Assign Roles to the Service Account
+### Step 3: Assign Roles to the Service Account
 
 **Required:**
 * Vertex AI User
@@ -78,7 +100,7 @@ Click **Create and Continue**.
 
 Click **Continue** → **Done**.
 
-#### 4. Generate the JSON Key
+### Step 4: Generate the JSON Key
 
 Find the service account you just created → right side → click **⋮** → **Manage Keys**.
 
@@ -88,7 +110,7 @@ Then:
 
 ⚠️ This is your one and only service account file.
 
-#### 5. Move it into your repository
+### Step 5: Move it into your repository
 
 Place it exactly here:
 
@@ -109,7 +131,7 @@ DB-LogAnalyzer/
   cli_wrapper/
 ```
 
-#### 6. Verify Permissions
+### Step 6: Verify Permissions
 
 Inside Docker, the script sets:
 
@@ -121,7 +143,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa.json
 
 ---
 
-## 🧩 3. Environment Variables
+## 3. Environment Variables
 
 Copy the template:
 
@@ -147,7 +169,7 @@ GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa.json
 
 ---
 
-## 📦 4. Pull the Docker Image
+## 4. Pull the Docker Image
 
 ```bash
 docker pull vanshikachaddha/fdb-log-analyzer:latest
@@ -157,7 +179,7 @@ This image contains the full Python environment + CLI + detectors + RAG pipeline
 
 ---
 
-## 📁 5. Provide Input Logs
+## 5. Provide Input Logs
 
 Place simulation logs (1+ XML files) in:
 
@@ -169,7 +191,7 @@ These will be automatically loaded into DuckDB.
 
 ---
 
-## ▶️ 6. Running the Agentic RCA Pipeline
+## 6. Running the Agentic RCA Pipeline
 
 A convenience script is included:
 
@@ -205,22 +227,23 @@ Run it with any query, for example:
 
 ---
 
-## 📝 Notes
+## Notes
 
 * Ensure Docker Desktop is running before executing commands
 * The service account JSON file must be placed in the exact location specified
 * All logs must be in XML format for proper parsing
 * The RAG corpus is pre-configured for the FDB log analyzer project
 
+---
 
-## 1.   Vision and Goals Of The Project:
+# 1. Vision and Goals Of The Project
 
-### Goal
-FoundationDB (FDB) is a distributed key-value database used in production by numerous companies, including Apple and Snowflake. As FDB runs, it generates logs, which are used for diagnostics. FDB logs display various aspects of runtime behavior, including ingress/egress counters, data movement progress, and errors. However, interpreting FDB’s logs is challenging due to their complexity, making manual analysis slow and error-prone.
+## Goal
+FoundationDB (FDB) is a distributed key-value database used in production by numerous companies, including Apple and Snowflake. As FDB runs, it generates logs, which are used for diagnostics. FDB logs display various aspects of runtime behavior, including ingress/egress counters, data movement progress, and errors. However, interpreting FDB's logs is challenging due to their complexity, making manual analysis slow and error-prone.
 
 This project aims to simplify and accelerate the process of analyzing FDB TraceEvent logs by developing a pipeline that parses raw logs into structured data, computes statistical rollups for anomaly detection, and integrates Large Language Models (LLMs) to provide guided diagnoses. By enabling operators to quickly detect anomalies, understand their causes, and take corrective action, this project will improve observability, reduce downtime, and enhance developer and operator productivity.
 
-### Features
+## Features
 - Log Parsing: Convert raw FDB logs (TraceEvent) into a normalized schema with fields such as timestamp, severity, role, and event-specific metrics.
 - Fast Querying: Store structured logs in DuckDB for efficient analytical queries and rollups.
 - Anomaly Detection: Apply baseline statistical methods (e.g., EWMA, z-scores) over key metrics like QueueBytes, GrvLatency, and Transactions/sec to surface anomalies.
@@ -230,79 +253,85 @@ This project aims to simplify and accelerate the process of analyzing FDB TraceE
 
 **To Summarize:** By the end of the semester, the project will deliver a working CLI tool that converts FDB logs into structured data and demonstrates incident detection and explanation.
 
-## 2. Users / Personas of the Project
+---
+
+# 2. Users / Personas of the Project
 This project is designed for Site Reliability Engineers (SREs), Database Operators, and new engineers working with FoundationDB. Their main challenge is diagnosing and resolving issues such as latency spikes, queue growth, or stalled transactions under time pressure. Today, this requires scanning large, complex log files and cross-referencing runbooks, which is slow and error-prone.
 
 The system will make this process more efficient by converting logs into structured rollups, highlighting anomalies, and offering guided AI-assisted explanations. Potential questions these users need answered include:
 
-- “Why is GRV latency spiking?”
-- “Are tlogs spilling to disk?”
-- “Is data movement stuck or thrashing?”
-- “Which storage servers are hot or behind?”
-- “Are exclusions or misconfigs hurting recruitment?”
-- “Is workload imbalance causing saturation?”
+- "Why is GRV latency spiking?"
+- "Are tlogs spilling to disk?"
+- "Is data movement stuck or thrashing?"
+- "Which storage servers are hot or behind?"
+- "Are exclusions or misconfigs hurting recruitment?"
+- "Is workload imbalance causing saturation?"
 
 These scenarios illustrate the core value of the system: helping users move from raw log scanning to fast, confident diagnosis and resolution.
 
-**Site Reliability Engineer (SRE)**
+## Site Reliability Engineer (SRE)
 
 - **Role:** Ensures uptime and performance of FoundationDB clusters, often under incident response conditions.
 - **Key Characteristics:** Works under time pressure, must quickly identify root causes, relies on logs and runbooks for troubleshooting.
 - **Goals:** Detect anomalies early, receive confident diagnoses, and reduce downtime through faster resolution.
 
-**Database Operator**
+## Database Operator
 - **Role:** Manages the daily operations of FoundationDB clusters, ensuring stable performance and smooth recovery from issues.
 - **Key Characteristics:** Routinely checks logs, monitors system health, and applies fixes. Manual log analysis can be slow and overwhelming.
 - **Goals:** Simplify log interpretation, automatically surface issues, and receive actionable next steps without deep log dives.
 
-**Student / New Engineer**
+## Student / New Engineer
 - **Role:** A learner or junior engineer onboarding to FoundationDB, still developing expertise with TraceEvent logs.
 - **Key Characteristics:** Finds raw logs complex and difficult to interpret without guidance. Depends on simplified explanations.
 - **Goals:** Accelerate learning, understand system behavior, and connect log patterns to likely causes with AI-assisted summaries.
 
-## 3.   Scope and Features Of The Project
-### Log Ingestion & Normalization
+---
+
+# 3. Scope and Features Of The Project
+
+## Log Ingestion & Normalization
 - Parser supporting JSON trace format with regex fallback for plaintext logs.  
 - Normalization into a typed schema with fields such as timestamp, severity, process, role, event, and event-specific metrics (e.g., `GrvLatency`, `QueueBytes`, `DurabilityLag`).  
 - Storage in DuckDB/Parquet for efficient queries.  
 - Windowed rollups (1s/10s/60s) for key counters to highlight trends and anomalies.  
 
-### Knowledge Ingestion
+## Knowledge Ingestion
 - Selected FoundationDB documentation, TraceEvent code comments, and curated runbooks.  
 - Chunking strategies: logs by time windows or anomaly slices; docs by semantic section.  
 - Metadata tagging (role, subsystem, metric) for targeted retrieval.  
 - *(Stretch)* Query planner mapping user questions to relevant logs, roles, metrics, and documents.  
 
-### Anomaly Detection & Summarization
+## Anomaly Detection & Summarization
 - Basic detectors (EWMA, z-score) for identifying unusual behavior.  
-- Summaries per role and per time window, including cross-role correlations (e.g., *“TLog lag increases while data movement increases”*).  
-- Fact table of extracted claims (e.g., *“DurabilityLag > 5s on 3 TLogs between 12:00–12:05”*).  
+- Summaries per role and per time window, including cross-role correlations (e.g., *"TLog lag increases while data movement increases"*).  
+- Fact table of extracted claims (e.g., *"DurabilityLag > 5s on 3 TLogs between 12:00–12:05"*).  
 - *(Stretch)* Prompt caching and reusable checklists to improve LLM efficiency.  
 
-### CLI Tools & Operator Workflow
+## CLI Tools & Operator Workflow
 - CLI commands for querying metrics through DuckDB.  
 - LLM-proposed safe commands (`grep`, `jq`, `fdbcli`) with bounded outputs.  
 - Step-by-step suggestions with diagnosis, confidence score, and next steps.  
 
-### Training & Evaluation
+## Training & Evaluation
 - Rule-based heuristics for common fault modes (e.g., TLog spill, recruitment churn, hot shard).  
 - Scenario bank with induced faults, stress tests, and normal operation logs.  
 - Evaluation metrics: detection precision/recall, diagnosis quality, tool usefulness, efficiency.  
 - *(Stretch)* Report cards with confusion matrices and ablations (e.g., RAG on/off, anomaly selection on/off).  
 - *(Stretch)* Programmatic labeling and synthetic Q&A generation.  
 
-### Stretch Features (Out-of-Scope)
+## Stretch Features (Out-of-Scope)
 - **Visualization & Dashboard:** Web-based or GUI dashboards (scope limited to CLI/TUI prototype).  
 - **Advanced Analytics:** Dashboards for cost and throughput monitoring.  
 - **Advanced ML & Scaling:** Large-scale pretraining or fine-tuning of LLMs beyond lightweight LoRA.  
 - **Distributed Deployment:** Multi-node support or enterprise observability integration (e.g., Prometheus, Grafana).  
 - **Security & Compliance:** Full security monitoring and compliance auditing.
 
-## 4. Solution Concept
+---
+
+# 4. Solution Concept
 
 ## Current Architecture
 <img width="1422" height="673" alt="Screenshot 2025-09-23 at 9 37 39 PM" src="https://github.com/user-attachments/assets/b980b93e-79e0-48dd-b1d2-9980b52e8a36" />
-
 
 ## Global Architectural Structure Of the Project
 
@@ -314,7 +343,7 @@ These scenarios illustrate the core value of the system: helping users move from
    - Upload JSON logs into DuckDB for efficient SQL-based analysis.  
 
 3. **Querying & Investigation**  
-   - Run SQL queries to explore event patterns (e.g., *“An error occurred at time X; what happened 5 seconds before?”*).  
+   - Run SQL queries to explore event patterns (e.g., *"An error occurred at time X; what happened 5 seconds before?"*).  
    - Investigate anomalies through rollups and targeted queries.  
 
 4. **AI Confidence Scoring**  
@@ -323,22 +352,23 @@ These scenarios illustrate the core value of the system: helping users move from
    - This loop continues until the confidence score exceeds the threshold.  
 
 5. **Diagnosis & Runbook Guidance**  
-   - Once confidence is high, the system outputs a diagnosis (e.g., *“TLog crashed,” “data movement stalled,” “storage server saturated”*).  
+   - Once confidence is high, the system outputs a diagnosis (e.g., *"TLog crashed," "data movement stalled," "storage server saturated"*).  
    - Next-step actions are suggested based on curated runbooks.  
 
 6. **Operator Workflow (CLI)**  
    - The entire process is accessible through a CLI (not copy-paste chat).  
    - Operators run queries, review AI suggestions, and validate results directly.  
 
-### Additional Considerations  
+## Additional Considerations  
 - **Testing:** Use test servers, unit tests, and simulation tests to validate accuracy.  
-- **Clues & Symptoms:** Operators may provide hints (e.g., *“memory is increasing”*) to guide AI query generation.  
+- **Clues & Symptoms:** Operators may provide hints (e.g., *"memory is increasing"*) to guide AI query generation.  
 - **Chunking:** Logs may be too large to process at once, so the system will prioritize recent or anomaly-rich chunks for analysis.  
 
-## Design Implications and Discussion:
+## Design Implications and Discussion
+
 1.  **Schema Normalization**  
    - **Implication:** Standardizing log fields (timestamp, severity, role, event, metrics) allows consistent queries and downstream analysis.  
-   - **Reason:** Without normalization, operators must repeatedly learn FDB’s complex log structure, slowing diagnosis.  
+   - **Reason:** Without normalization, operators must repeatedly learn FDB's complex log structure, slowing diagnosis.  
 2.  **Windowed Rollups & Anomaly Detection**  
    - **Implication:** Summarizing metrics in 1s/10s/60s windows highlights trends without overwhelming the user with raw data.  
    - **Reason:** Operators need to see *when* anomalies begin, not just static values. Simple baselines (EWMA, z-score) provide fast, explainable results.
@@ -352,16 +382,18 @@ These scenarios illustrate the core value of the system: helping users move from
   - **Implication:** Introducing a confidence threshold formalizes the uncertainty of ML-assisted diagnosis. Below-threshold results trigger recursive querying, which increases latency but improves accuracy.  
   - **Reason:** In high-pressure environments, false positives slow down rather than help. A confidence threshold allows the system to refine results until they are trustworthy enough for operators to act on.
 
-## 5. Acceptance criteria
+---
+
+# 5. Acceptance Criteria
 At the end of this semester, the project will be considered successful if it meets the following minimum expectations and stretch/demo goals:  
 
-### Minimum Expectations  
+## Minimum Expectations  
 - **CLI Tool:** Parses raw FDB logs into a DuckDB database.  
 - **Structured Storage:** Database contains structured `events` and `metrics` tables with rollups at 1s / 10s / 60s windows.  
 - **Query Support:** Operators can run SQL queries on key metrics (e.g., latency, durability lag, queue size).  
 - **Documentation:** README with setup instructions, CLI usage examples, and an architecture diagram.  
 
-### End-of-Semester Demo Goals  
+## End-of-Semester Demo Goals  
 - **Operator Questions:** System can answer at least **10 curated operator questions**.  
   - Each answer should include:  
     - Citations (log snippets or metrics).  
@@ -371,39 +403,42 @@ At the end of this semester, the project will be considered successful if it mee
     - ≥ 0.7 confidence score.  
     - ≥ 0.9 coverage@10 (system surfaces the correct log/doc chunk in the top 10 results).
     
-### Stretch Goals  
+## Stretch Goals  
 - **Prompt Caching & Summarization:** Reuse structured prompts and generate role-based summaries to reduce LLM overhead.
 - **Scenario Bank & Evaluation:** Build a dataset of induced fault scenarios with ground-truth labels; evaluate detection precision/recall, diagnosis quality, and efficiency. 
 - **Visualization:** Charts or dashboards for anomaly visualization (beyond CLI scope for MVP).
-- **Programmatic Labeling & Synthetic Q&A:** Use rule-based heuristics to auto-label log windows with scenarios (e.g., TLog Spill, Recruitment Churn). Generate synthetic Q&A pairs (including “bad answer → correction” examples) to improve LLM accuracy. 
+- **Programmatic Labeling & Synthetic Q&A:** Use rule-based heuristics to auto-label log windows with scenarios (e.g., TLog Spill, Recruitment Churn). Generate synthetic Q&A pairs (including "bad answer → correction" examples) to improve LLM accuracy. 
 
-## 6. Release Planning
+---
+
+# 6. Release Planning
 The project will be delivered incrementally in phases, each building on the previous and providing usable functionality along the way. This phased approach will ensure early value delivery, reduces risk, allows iterative improvement based on feedback.
 
-### Iteration 1 (Weeks 1–3): Log Ingestion & Normalization
+## Iteration 1 (Weeks 1–3): Log Ingestion & Normalization
 - Logs normalized into a typed schema (timestamp, severity, process, role, event, metrics).
 - Metrics stored in DuckDB/Parquet with 1s/10s/60s rollups.
 - **User Story:** As an operator, I want raw logs converted into structured tables so I can query performance trends.
 - **Deliverable:** CLI tool to parse FoundationDB logs (JSON trace format + regex fallback for plaintext).
-### Iteration 2 (Weeks 3–5): Knowledge Ingestion
+
+## Iteration 2 (Weeks 3–5): Knowledge Ingestion
 - Semantic chunking and metadata tagging for efficient retrieval.
 - Early query planner mapping user questions to relevant roles/metrics/docs.
 - **User Story:** As an operator, I want logs connected with documentation and runbooks so I can understand not only symptoms but also causes.
 - **Deliverable:** Knowledge base built from FoundationDB docs, TraceEvent code comments, and runbooks.
-### Iteration 3 (Weeks 5–7): Anomaly Detection & Summarization
+
+## Iteration 3 (Weeks 5–7): Anomaly Detection & Summarization
 - Summaries generated per role and time window, with cross-role correlations.
-- Fact table storing extracted claims (e.g., “DurabilityLag >5s on 3 TLogs”).
+- Fact table storing extracted claims (e.g., "DurabilityLag >5s on 3 TLogs").
 - **User Story:** As an operator, I want anomalies automatically flagged and explained so I can quickly prioritize issues.
 - **Deliverable:** Baseline anomaly detectors (EWMA, z-score) applied to log metrics.
-### Iteration 4 (Weeks 7–9): Exposing Tools
+
+## Iteration 4 (Weeks 7–9): Exposing Tools
 - Operator workflow: diagnosis, confidence score, and recommended next steps.
 - **User Story:** As an operator, I want an interface that suggests commands and provides structured results so I can troubleshoot faster.
 - **Deliverable:** CLI tools for querying metrics (DuckDB SQL) and proposing safe commands (grep/jq/fdbcli).
-### Iteration 5 (Weeks 9–12): Training & Evaluation
+
+## Iteration 5 (Weeks 9–12): Training & Evaluation
 - Evaluation harness measuring precision/recall, diagnosis quality, and tool usefulness.
 - Final demo: answer 10 curated operator questions and correctly diagnose 3+ failure modes with ≥0.7 confidence.
 - **User Story:** As a team, we want evaluation metrics and incident replays so we can validate that the system works in real-world-like conditions.
 - **Deliverable:** Rule-based heuristics for common fault modes, scenario bank with induced/stress logs.
-
-
-** **
