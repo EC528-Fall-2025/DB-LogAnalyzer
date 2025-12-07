@@ -42,7 +42,7 @@
 - **Sprint 5 Demo Video:** [Link](https://drive.google.com/file/d/19Kr-ciG37Z2RYUtSk78TWc8ZQ5ofjWtg/view?usp=sharing)  
 - **Sprint 5 Demo Slides:** [Link](https://docs.google.com/presentation/d/1BBK2vaw_zYxLhVQ5w8xMsOllPMB-lKNy2bJqaRM2Vh4/edit?usp=sharing)
 - **Sprint 6 Demo Video:** [Link]()  
-- **Sprint 6 Demo Slides:** [Link](https://docs.google.com/presentation/d/1kQMmr0Hp2SKAnSIPVoThiDE941WNlLWNY_2IJh3QJoc/edit?usp=sharing)
+- **Sprint 6 Demo Slides:** [Link](https://drive.google.com/file/d/1G_CoCK4lnzfWWfYMcuD2V0GzCTLGI6nd/view?usp=sharing)
 
 ## Paper
 
@@ -393,15 +393,23 @@ At the end of this semester, the project will be considered successful if it mee
 - **Query Support:** Operators can run SQL queries on key metrics (e.g., latency, durability lag, queue size).  
 - **Documentation:** README with setup instructions, CLI usage examples, and an architecture diagram.  
 
-## End-of-Semester Demo Goals  
-- **Operator Questions:** System can answer at least **10 curated operator questions**.  
-  - Each answer should include:  
-    - Citations (log snippets or metrics).  
-    - Runnable tool commands (SQL queries, `grep`, or `jq`).  
-- **Failure Mode Diagnosis:** Correctly diagnose at least **3 distinct failure modes** (e.g., TLog spill, recruitment churn, data movement stuck).  
-  - Each diagnosis should achieve:  
-    - ≥ 0.7 confidence score.  
-    - ≥ 0.9 coverage@10 (system surfaces the correct log/doc chunk in the top 10 results).
+## End-of-Semester Demo Goals (Achieved)
+
+### Operator Questions
+The system correctly answers 10+ curated operator questions, each including:
+* Citations from logs and detector outputs
+* Runnable commands (SQL queries, CLI options, or grep/jq references)
+* Contextual explanations using RAG + Gemini reasoning
+
+### Failure Mode Diagnosis
+The agentic RCA pipeline successfully diagnoses 3 or more failure modes, including:
+* TLog failures
+* Recovery cascades
+* Storage engine pressure
+
+Each diagnosis includes:
+* Confidence ≥ 0.7 (often ≥ 0.9 in practice using the iterative loop)
+* Coverage@10 ≥ 0.9, with the RAG system surfacing correct log/document chunks consistently in the top retrieval results
     
 ## Stretch Goals  
 - **Prompt Caching & Summarization:** Reuse structured prompts and generate role-based summaries to reduce LLM overhead.
