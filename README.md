@@ -21,6 +21,7 @@
 - **Sprint 4 Demo Slides:** [Link](https://docs.google.com/presentation/d/1I2S8yGN1IRloVvZTsVIafV4YTwY8hIcz/edit?usp=sharing&ouid=113513264960850511829&rtpof=true&sd=true)
 - **Sprint 5 Demo Video:** [Link](https://drive.google.com/file/d/19Kr-ciG37Z2RYUtSk78TWc8ZQ5ofjWtg/view?usp=sharing)  
 - **Sprint 5 Demo Slides:** [Link](https://docs.google.com/presentation/d/1BBK2vaw_zYxLhVQ5w8xMsOllPMB-lKNy2bJqaRM2Vh4/edit?usp=sharing)
+
 - **Sprint 6 Demo Video:** [Link]()  
 - **Sprint 6 Demo Slides:** [Link](https://docs.google.com/presentation/d/1kQMmr0Hp2SKAnSIPVoThiDE941WNlLWNY_2IJh3QJoc/edit?usp=sharing)
 
@@ -30,6 +31,187 @@
 
 - _FDB-LogAnalyzer: Agentic FoundationDB Log Analysis with Timeline + RAG_  
   Draft: [Link](https://docs.google.com/document/d/1xx0jur50JvdzV1Zm70kIeVCEnbQF9N3S/edit)
+# FDB Log Analyzer Setup Guide
+
+## 🚀 1. Prerequisites
+
+### Install Docker Desktop
+Download and install from: https://www.docker.com/products/docker-desktop/
+
+### Google Cloud Project Required
+Used for:
+* Vertex AI
+* Gemini Models
+* RAG Corpus Retrieval
+
+### Enable Required APIs
+In Google Cloud Console → APIs & Services → Enable:
+* Vertex AI API
+* Vertex AI Generative Models API
+
+---
+
+## 🔐 2. Service Account Setup
+
+### 1. Navigate to Service Accounts
+In Google Cloud Console → IAM & Admin → Service Accounts
+
+### 2. Create New Service Account
+Click **+ CREATE SERVICE ACCOUNT**
+
+Fill in:
+* **Name:** `fdb-log-analyzer`
+* **ID:** auto-filled
+* **Description:** Vertex AI RAG access
+
+Click **Create and Continue**.
+
+### 3. Assign Roles to the Service Account
+
+**Required:**
+* Vertex AI User
+* Vertex AI Admin (if your pipeline needs modifications to the corpus)
+* Storage Object Viewer
+
+**Optional (but safe to include):**
+* Storage Object Creator (if any writes happen)
+
+Click **Continue** → **Done**.
+
+### 4. Generate the JSON Key
+
+Find the service account you just created → right side → click **⋮** → **Manage Keys**.
+
+Then:
+1. Click **➕ ADD KEY** → **Create new key** → **JSON**
+2. Google Cloud will download: `<something>.json`
+
+⚠️ This is your one and only service account file.
+
+### 5. Move it into your repository
+
+Place it exactly here:
+
+```
+secrets/sa.json
+```
+
+Your folder structure should look like:
+
+```
+DB-LogAnalyzer/
+  secrets/
+    sa.json   ← your downloaded key
+  run_agentic.sh
+  .env
+  Dockerfile
+  tools/
+  cli_wrapper/
+```
+
+### 6. Verify Permissions
+
+Inside Docker, the script sets:
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa.json
+```
+
+⚠️ **Do NOT commit `sa.json` to GitHub.**
+
+---
+
+## 🧩 3. Environment Variables
+
+Copy the template:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` and fill in:
+
+```bash
+GEMINI_API_KEY=<>
+```
+
+The following values are already preset and correct:
+
+```bash
+GOOGLE_CLOUD_LOCATION=europe-west1
+RAG_CORPUS_RESOURCE=projects/fdb-log-analyzer/locations/europe-west1/ragCorpora/4611686018427387904
+RAG_MODEL=gemini-2.5-pro
+RAG_USE_ADC=1
+GOOGLE_APPLICATION_CREDENTIALS=/secrets/sa.json
+```
+
+---
+
+## 📦 4. Pull the Docker Image
+
+```bash
+docker pull vanshikachaddha/fdb-log-analyzer:latest
+```
+
+This image contains the full Python environment + CLI + detectors + RAG pipeline.
+
+---
+
+## 📁 5. Provide Input Logs
+
+Place simulation logs (1+ XML files) in:
+
+```
+data/log_example/simlogs/
+```
+
+These will be automatically loaded into DuckDB.
+
+---
+
+## ▶️ 6. Running the Agentic RCA Pipeline
+
+A convenience script is included:
+
+```
+run_agentic.sh
+```
+
+Make it executable:
+
+```bash
+chmod +x run_agentic.sh
+```
+
+Run it with any query, for example:
+
+```bash
+./run_agentic.sh "What issue is being tested?"
+```
+
+### This script performs:
+
+**Stage 1 — Log ingestion & DuckDB pipeline**
+* Loads XML logs
+* Parses events and metrics
+* Stores normalized tables in DuckDB
+
+**Stage 2 — Agentic RCA with Vertex AI RAG**
+* Runs detectors
+* Retrieves RAG documents
+* Iteratively queries Gemini for hypotheses
+* Stops when confidence ≥ 0.9
+* Outputs final RCA summary & evidence
+
+---
+
+## 📝 Notes
+
+* Ensure Docker Desktop is running before executing commands
+* The service account JSON file must be placed in the exact location specified
+* All logs must be in XML format for proper parsing
+* The RAG corpus is pre-configured for the FDB log analyzer project
+
 
 ## 1.   Vision and Goals Of The Project:
 
