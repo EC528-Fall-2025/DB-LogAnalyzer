@@ -31,32 +31,32 @@
 
 - _FDB-LogAnalyzer: Agentic FoundationDB Log Analysis with Timeline + RAG_  
   Draft: [Link](https://docs.google.com/document/d/1xx0jur50JvdzV1Zm70kIeVCEnbQF9N3S/edit)
-# FDB Log Analyzer Setup Guide
+## FDB Log Analyzer Setup Guide
 
-## 🚀 1. Prerequisites
+### 🚀 1. Prerequisites
 
-### Install Docker Desktop
+#### Install Docker Desktop
 Download and install from: https://www.docker.com/products/docker-desktop/
 
-### Google Cloud Project Required
+#### Google Cloud Project Required
 Used for:
 * Vertex AI
 * Gemini Models
 * RAG Corpus Retrieval
 
-### Enable Required APIs
+#### Enable Required APIs
 In Google Cloud Console → APIs & Services → Enable:
 * Vertex AI API
 * Vertex AI Generative Models API
 
 ---
 
-## 🔐 2. Service Account Setup
+### 🔐 2. Service Account Setup
 
-### 1. Navigate to Service Accounts
+#### 1. Navigate to Service Accounts
 In Google Cloud Console → IAM & Admin → Service Accounts
 
-### 2. Create New Service Account
+#### 2. Create New Service Account
 Click **+ CREATE SERVICE ACCOUNT**
 
 Fill in:
@@ -66,7 +66,7 @@ Fill in:
 
 Click **Create and Continue**.
 
-### 3. Assign Roles to the Service Account
+#### 3. Assign Roles to the Service Account
 
 **Required:**
 * Vertex AI User
@@ -78,7 +78,7 @@ Click **Create and Continue**.
 
 Click **Continue** → **Done**.
 
-### 4. Generate the JSON Key
+#### 4. Generate the JSON Key
 
 Find the service account you just created → right side → click **⋮** → **Manage Keys**.
 
@@ -88,7 +88,7 @@ Then:
 
 ⚠️ This is your one and only service account file.
 
-### 5. Move it into your repository
+#### 5. Move it into your repository
 
 Place it exactly here:
 
@@ -109,7 +109,7 @@ DB-LogAnalyzer/
   cli_wrapper/
 ```
 
-### 6. Verify Permissions
+#### 6. Verify Permissions
 
 Inside Docker, the script sets:
 
